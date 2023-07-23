@@ -1,0 +1,43 @@
+{
+  "name": "tuckbox",
+  "version": "0.0.1",
+  "description": "Tuckbox generator for card and board games",
+  "main": "main.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "install": "npm run build"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seanmiddleditch/tuckbox.git"
+  },
+  "keywords": [
+    "tuckbox",
+    "pdf",
+    "generator"
+  ],
+  "author": "Sean Middleditch",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/seanmiddleditch/tuckbox/issues"
+  },
+  "homepage": "https://github.com/seanmiddleditch/tuckbox#readme",
+  "dependencies": {
+    "@suid/icons-material": "^0.6.9",
+    "@suid/material": "^0.14.2",
+    "@suid/vite-plugin": "^0.1.4",
+    "jspdf": "^2.5.1",
+    "lodash-es": "^4.17.21",
+    "solid-color": "^0.0.4",
+    "solid-js": "^1.7.8",
+    "tinycolor2": "^1.6.0"
+  },
+  "devDependencies": {
+    "vite": "^4.4.7",
+    "vite-plugin-solid": "^2.7.0"
+  }
+}
