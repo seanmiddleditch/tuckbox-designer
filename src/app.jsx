@@ -4,11 +4,12 @@ import { convert } from './convert'
 import { generate } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
-import { Box, Modal, Button, ButtonGroup, TextField, InputAdornment } from '@suid/material'
+import { Button, ButtonGroup, TextField, InputAdornment } from '@suid/material'
 import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
 import { Toggle } from './components/toggle'
 import { ColorPicker } from './components/color-picker'
+import { SizeInput } from './components/size-input'
 import { createTheme, ThemeProvider } from '@suid/material/styles'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import patchJsPdf from './jspdf-patch'
@@ -131,15 +132,6 @@ export const App = () => {
 
         window.open(url, 'pdf')
     }
-    
-    const SizeInput = (props) => 
-        <TextField id={props.name} name={props.name} size='small' variant='outlined' sx={{width: '14ch'}}
-            value={props.value}
-            label={props.label}
-            onChange={e => props.onChange(e.target.value)}
-            InputProps={{
-                endAdornment: () => <InputAdornment position='end'>{props.units ?? config.units}</InputAdornment>,
-            }}/>
 
     return <ThemeProvider theme={theme}>
         <HStack spacing={8} width='100%' height='100%'>
@@ -160,9 +152,9 @@ export const App = () => {
                 <h2>Deck Size</h2>
                 <VStack alignItems='flex-start'>
                     <HStack>
-                        <SizeInput name="width" value={config.size.width} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                        <SizeInput name="height" value={config.size.height} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                        <SizeInput name="depth" value={config.size.depth} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                        <SizeInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                        <SizeInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                        <SizeInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                     </HStack>
                 </VStack>
                 <h2>Design</h2>
@@ -178,16 +170,12 @@ export const App = () => {
                             <Select.Item value='Helvetica'>Helvetica</Select.Item>
                             <Select.Item value='Times-Roman'>Times Roman</Select.Item>
                         </Select>
-                        <SizeInput label='Font Size' size='small' variant='outlined' units='pt' value={config.font.size} onChange={value => setConfig('font', 'size', value)} />
+                        <SizeInput label='Font Size' units='pt' value={config.font.size} onChange={value => setConfig('font', 'size', value)} />
                         <TextField label='Font Weight' size='small' variant='outlined' sx={{ width: '14ch' }} value={config.font.weight} onChange={(e, value) => setConfig('font', 'weight', value)} />
                     </HStack>
                 </VStack>
                 <h2>Download</h2>
                 <VStack>
-                    <Toggle.Group exclusive size='small' value={preview()} onChange={value => setPreview(value)}>
-                        <Toggle.Button value='canvas'>Canvas</Toggle.Button>
-                        <Toggle.Button value='pdf'>PDF</Toggle.Button>
-                    </Toggle.Group>
                     <ButtonGroup>
                         <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
                         <Button onClick={() => savePdf()} size='small' variant='contained'><DownloadIcon title='Download PDF'/></Button>
@@ -199,7 +187,6 @@ export const App = () => {
                 <a class="hidden" ref={link} style={{ display: 'none' }}></a>
             </VStack>
             <VStack width='100%' alignItems='flex-start'>
-                <h2>Preview</h2>
                 <Switch fallback={<>
                     <canvas width="800" height="600" ref={canvas} style={{ border: '1px solid grey' }}></canvas>
                 </>}>
