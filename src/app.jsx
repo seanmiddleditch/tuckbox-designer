@@ -187,6 +187,13 @@ export const App = () => {
                 <a class="hidden" ref={link} style={{ display: 'none' }}></a>
             </VStack>
             <VStack width='100%' alignItems='flex-start'>
+                <HStack alignItems='baseline'>
+                    <h2>Preview</h2>
+                    <Toggle.Group exclusive size='small' style={{ height: '2.5em', 'vertical-align': 'end' }} value={preview()} onChange={value => setPreview(value)}>
+                        <Toggle.Button value='canvas'>Canvas</Toggle.Button>
+                        <Toggle.Button value='pdf'>PDF</Toggle.Button>
+                    </Toggle.Group>
+                </HStack>
                 <Switch fallback={<>
                     <canvas width="800" height="600" ref={canvas} style={{ border: '1px solid grey' }}></canvas>
                 </>}>
