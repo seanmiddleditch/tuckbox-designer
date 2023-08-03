@@ -4,12 +4,13 @@ import { convert } from './convert'
 import { generate } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
-import { Button, ButtonGroup, TextField, InputAdornment } from '@suid/material'
+import { Button, ButtonGroup, TextField } from '@suid/material'
 import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
 import { Toggle } from './components/toggle'
 import { ColorPicker } from './components/color-picker'
 import { SizeInput } from './components/size-input'
+import { ImageSelect } from './components/image-select'
 import { createTheme, ThemeProvider } from '@suid/material/styles'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import patchJsPdf from './jspdf-patch'
@@ -24,6 +25,11 @@ const defualtConfig = {
         size: 18,
         weight: 700,
     },
+    image: {
+        front: {
+
+        },
+    },
     size: {
         width: 2.25,
         height: 3.5,
@@ -35,6 +41,25 @@ export const App = () => {
     const theme = createTheme()
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [preview, setPreview] = createSignal('canvas')
+
+    const imageFront = (() => {
+        const [getter, setImage] = createSignal(null)
+            
+        createEffect(() => {
+            if (config.image.front != '') {
+                const img = new Image
+                img.onload = () => {
+                    setImage(img)
+                }
+                img.src = config.image.front
+            }
+            else {
+                setImage(null)
+            }
+        })
+
+        return getter
+    })()
 
     let page_details = undefined
     let canvas = undefined
@@ -73,6 +98,26 @@ export const App = () => {
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
         generate(ctx, size, config.title, config.color, fontName())
+
+        const front = imageFront()
+        if (front) {
+            let w = front.width, h = front.height
+            if (w > h) {
+                const ar = front.height / front.width
+                w = Math.min(w, size.width)
+                h = w * ar
+            }
+            else {
+                const ar = front.width / front.height
+                h = Math.min(h, size.height)
+                w = h * ar
+            }
+
+            w = convert(w, 'px', 'pt')
+            h = convert(h, 'px', 'pt')
+                
+            ctx.drawImage(front, size.depth * 2 + size.width * 0.5 - w * 0.5, size.depth * 2 + size.height * 0.5 - h * 0.5, w, h)
+        }
     })
 
     const generatePdfBlob = () => {
@@ -161,6 +206,7 @@ export const App = () => {
                 <VStack alignItems='flex-start'>
                     <ColorPicker label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
                 </VStack>
+                <ImageSelect imageWidth={convert(config.size.width, config.units, 'px')} imageHeight={convert(config.size.height, config.units, 'px')} onChange={image => setConfig('image', 'front', image.toDataURL())}/>
                 <h2>Title & Font</h2>
                 <VStack alignItems='flex-start'>
                     <TextField id="title" name="title" size='small' label='Title' variant='outlined' sx={{ width: '100%' }} value={config.title} onChange={e => setConfig('title', e.target.value)} />

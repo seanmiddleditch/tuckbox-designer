@@ -30,6 +30,7 @@
     "@suid/icons-material": "^0.6.9",
     "@suid/material": "^0.14.2",
     "@suid/vite-plugin": "^0.1.4",
+    "cropperjs": "^1.5.13",
     "jspdf": "^2.5.1",
     "lodash-es": "^4.17.21",
     "solid-color": "^0.0.4",
