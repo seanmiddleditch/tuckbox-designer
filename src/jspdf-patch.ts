@@ -30,5 +30,5 @@ export default function(ctx: Context2d): CanvasRenderingContext2D {
         }
     }
 
-    return ctx as unknown
+    return (ctx as unknown) as CanvasRenderingContext2D
 }

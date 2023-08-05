@@ -1,6 +1,6 @@
 import { createEffect, createSignal, Switch, Match } from 'solid-js'
-import { paperSize } from './paper'
-import { convert } from './convert'
+import { paperSize, PaperFormats } from './paper'
+import { convert, Units } from './convert'
 import { generate } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
@@ -9,7 +9,7 @@ import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
 import { Toggle } from './components/toggle'
 import { ColorPicker } from './components/color-picker'
-import { SizeInput } from './components/size-input'
+import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
 import { Download as DownloadIcon } from '@suid/icons-material'
@@ -17,7 +17,31 @@ import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
 
-const defualtConfig = {
+interface Font {
+    family: string
+    size: number
+    weight: number
+}
+
+interface Size {
+    width: number
+    height: number
+    depth: number
+}
+
+interface Config {
+    units: Units,
+    page: PaperFormats,
+    title: string,
+    color: string,
+    font: Font,
+    image: {
+        front: string
+    },
+    size: Size
+}
+
+const defualtConfig: Config = {
     units: 'in',
     page: 'letter',
     title: 'Sample',
@@ -182,11 +206,11 @@ export const App = () => {
         <VStack>
             <h2>Page & Print</h2>
             <HStack>
-                <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value)}>
+                <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
                     <Select.Item value='letter'>US Letter</Select.Item>
                     <Select.Item value='a4'>A4</Select.Item>
                 </Select>
-                <Select id='page-size' label='Units' value={config.units} onChange={value => setConfig('units', value)}>
+                <Select id='page-size' label='Units' value={config.units} onChange={value => setConfig('units', value as Units)}>
                     <Select.Item value='cm'>centimeters</Select.Item>
                     <Select.Item value='mm'>millimeters</Select.Item>
                     <Select.Item value='in'>inches</Select.Item>
@@ -196,9 +220,9 @@ export const App = () => {
             <h2>Deck Size</h2>
             <VStack alignItems='flex-start'>
                 <HStack>
-                    <SizeInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                    <SizeInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                    <SizeInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                    <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                    <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                    <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                 </HStack>
             </VStack>
             <h2>Design</h2>
@@ -215,8 +239,8 @@ export const App = () => {
                         <Select.Item value='Helvetica'>Helvetica</Select.Item>
                         <Select.Item value='Times-Roman'>Times Roman</Select.Item>
                     </Select>
-                    <SizeInput id='font-size' label='Font Size' units='pt' value={config.font.size} onChange={value => setConfig('font', 'size', value)} />
-                    <TextInput id='font-weight' label='Font Weight' sx={{ width: '14ch' }} value={config.font.weight} onChange={(value: string) => setConfig('font', 'weight', value)} />
+                    <NumberInput id='font-size' label='Font Size' units='pt' value={config.font.size} onChange={value => setConfig('font', 'size', value)} />
+                    <NumberInput id='font-weight' label='Font Weight' value={config.font.weight} onChange={value => setConfig('font', 'weight', value)} />
                 </HStack>
             </VStack>
             <h2>Download</h2>

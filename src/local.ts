@@ -1,9 +1,9 @@
 import { createEffect } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { SetStoreFunction, createStore } from 'solid-js/store'
 
-export function createLocalStore(name: string, init: any) {
+export function createLocalStore<T extends Object>(name: string, init: T): [T, SetStoreFunction<T>] {
     const localState = localStorage.getItem(name)
-    const [state, setState] = createStore(localState ? JSON.parse(localState) : init)
+    const [state, setState] = createStore<T>(localState ? JSON.parse(localState) : init)
 
     createEffect(() => localStorage.setItem(name, JSON.stringify(state)))
     return [state, setState]
