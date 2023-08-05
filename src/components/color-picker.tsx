@@ -1,8 +1,14 @@
 import { Button, Modal, Box, TextField, InputAdornment } from '@suid/material'
+import { Component } from 'solid-js'
 import { createSignal } from 'solid-js'
-import { ChromePicker } from 'solid-color'
+import { ChromePicker, ColorResult } from 'solid-color'
 
-const ColorButton = props => <Button onClick={props.onClick} sx={{ padding: 0, 'min-width': 0 }}>
+interface ColorButtonsProps {
+    color: string,
+    onClick: (e: any) => void
+}
+
+const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} sx={{ padding: 0 }}>
     <div style={{
         'width': '1.5em',
         'height': '1.5em',
@@ -28,10 +34,16 @@ const ColorButton = props => <Button onClick={props.onClick} sx={{ padding: 0, '
     </div>
 </Button>
 
-export const ColorPicker = props => {
+interface ColorPickerProps {
+    color: string,
+    label: string,
+    onChange: (value: string) => void
+}
+
+export const ColorPicker: Component<ColorPickerProps> = props => {
     const [isColorOpen, setColorOpen] = createSignal(false)
 
-    const alphify = color => color.hex + ('0' + Math.round(color.rgb.a * 255).toString(16)).slice(-2)
+    const alphify = (color: ColorResult) => color.hex + ('0' + Math.round((color.rgb.a ?? 1) * 255).toString(16)).slice(-2)
 
     return <>
         <TextField
@@ -40,7 +52,7 @@ export const ColorPicker = props => {
             label={props.label}
             value={props.color}
             InputProps={{
-                endAdornment: () => <InputAdornment position='end'><ColorButton color={props.color} onChange={props.onChange} onClick={() => setColorOpen(true)} /></InputAdornment>,
+                endAdornment: <InputAdornment position='end'><ColorButton color={props.color} onClick={() => setColorOpen(true)} /></InputAdornment>,
             }}/>
         <Modal open={isColorOpen()} onClose={() => setColorOpen(false)}>
             <Box sx={{

@@ -1,3 +1,4 @@
+import { Context2d } from 'jspdf'
 import { mm2pt } from './convert'
 
 interface DeckSize {
@@ -118,7 +119,7 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
         ctx.lineTo(back.x + size.width * 0.9, back.y - size.depth)
     }
 
-    const wrapText = (text, w, lineHeight, cb) => {
+    const wrapText = (text: string, w: number, lineHeight: number, cb: (t: string, y: number) => void) => {
         var words = text.split(/\s+/)
         var line = ''
         var first = true
@@ -127,7 +128,7 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
 
         for (const word of words) {
             const attempt = line + word + ' '
-            const m = ctx.measureText(attempt)
+            const m: any = ctx.measureText(attempt)
             
             if (m.width > w && !first) {
                 cb(line, yOffset)
@@ -146,11 +147,11 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
             cb(line, yOffset)
     }
 
-    const writeLine = (text, x, y, w) => {
+    const writeLine = (text: string, x: number, y: number, w: number) => {
         wrapText(text, w, 20, (line, yOffset) => ctx.fillText(line, x, y + yOffset, w))
     }
 
-    const writeCenterAngle = (text, x, y, r, w) => {
+    const writeCenterAngle = (text: string, x: number, y: number, r: number, w: number) => {
         ctx.save()
         ctx.translate(x, y)
         ctx.rotate(r)
@@ -167,8 +168,8 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
             }
         })()
 
-        const cb = (line, yOffset) => {
-            const m = ctx.measureText(line)
+        const cb = (line: string, yOffset: number) => {
+            const m: any = ctx.measureText(line)
             ctx.fillText(line, -m.width * xs, yOffset)
         }
 
