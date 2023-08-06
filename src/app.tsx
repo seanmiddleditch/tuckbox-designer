@@ -15,7 +15,7 @@ import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import { DeepPartial } from 'ts-essentials'
-import { Font, Size, Face } from './types'
+import { Font, Size, Face, RGB } from './types'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
@@ -24,32 +24,32 @@ import { ToggleSwitch } from './components/toggle-switch'
 type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
 
 interface Config {
-    units: Units,
-    page: PaperFormats,
-    title: string,
-    color: string,
+    units: Units
+    page: PaperFormats
+    title: string
+    color: RGB
     view: {
         preview: 'canvas' | 'pdf',
         face: Faces
     }
     face: {
-        front: Face,
-        back: Face & { sameAsFront: boolean },
-        top: Face,
-        bottom: Face & { sameAsTop: boolean },
-        left: Face,
-        right: Face & { sameAsLeft: boolean },
+        front: Face
+        back: Face & { sameAsFront: boolean }
+        top: Face
+        bottom: Face & { sameAsTop: boolean }
+        left: Face
+        right: Face & { sameAsLeft: boolean }
     },
     size: Size
 }
 
 interface FaceImageCache {
-    front?: HTMLImageElement,
-    back?: HTMLImageElement,
-    top?: HTMLImageElement,
-    bottom?: HTMLImageElement,
-    left?: HTMLImageElement,
-    right?: HTMLImageElement,
+    front?: HTMLImageElement
+    back?: HTMLImageElement
+    top?: HTMLImageElement
+    bottom?: HTMLImageElement
+    left?: HTMLImageElement
+    right?: HTMLImageElement
 }
 
 const defaultFont: Font = {
@@ -67,7 +67,7 @@ const defualtConfig: Config = {
     units: 'in',
     page: 'letter',
     title: 'Sample',
-    color: '#ffffff00',
+    color: { r: 1, g: 1, b: 1 },
     view: {
         preview: 'canvas',
         face: 'front',
@@ -262,7 +262,7 @@ export const App = () => {
                     <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                 </HStack>
                 <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
-                <ColorPicker label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
+                <ColorPicker id='box-color' label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
             </VStack>
             <HStack alignItems='baseline'>
                 <h2>Faces</h2>

@@ -1,5 +1,11 @@
 export as namespace types;
 
+export interface RGB {
+    r: number
+    g: number
+    b: number
+}
+
 export interface Font {
     family: string
     size: number
@@ -13,7 +19,7 @@ export interface Size {
 }
 
 export interface Face {
-    text: string,
-    font: Font,
-    image?: string,
+    text: string
+    font: Font
+    image?: string
 }

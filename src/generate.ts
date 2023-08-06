@@ -1,5 +1,5 @@
 import { mm2pt, convert } from './convert'
-import { Size, Font } from './types'
+import { Size, Font, RGB } from './types'
 
 export interface FaceOptions {
     text?: string,
@@ -9,7 +9,7 @@ export interface FaceOptions {
 
 export interface GenerateOptions {
     size: Size,
-    color: string,
+    color: RGB,
     face: {
         front: FaceOptions,
         back: FaceOptions,
@@ -257,9 +257,9 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
     // background color (overlap to handle bleed)
     ctx.save()
-    if (options.color && options.color != '#ffffff00') {
+    {
         ctx.setLineDash([])
-        ctx.fillStyle = options.color
+        ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
 
         ctx.fillRect(back.x - size.depth - bleed,
             back.y - size.depth * 1.5 - bleed,
