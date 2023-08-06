@@ -87,7 +87,15 @@ const defualtConfig: Config = {
     },
 }
 
-const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units, setValue: (values: DeepPartial<Face>) => void }) => 
+interface FaceComponentProps {
+    id: string
+    face: Face
+    width: number
+    height: number
+    setValue: (values: DeepPartial<Face>) => void
+}
+
+const FaceComponent = (props: FaceComponentProps) => 
     <VStack alignItems='flex-start'>
         <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.face.text} onChange={value => props.setValue({ text: value })} />
         <HStack>
@@ -99,7 +107,7 @@ const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units
             <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' value={props.face.font.size} onChange={value => props.setValue({ font: { size: value } })} />
             <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={value => props.setValue({ font: { weight: value } })} />
         </HStack>
-        <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={convert(props.size.width, props.units, 'px')} imageHeight={convert(props.size.height, props.units, 'px')} onChange={image => props.setValue({ image: image.toDataURL() })}/>
+        <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={props.width} imageHeight={props.height} onChange={image => props.setValue({ image: image.toDataURL() })}/>
     </VStack>
 
 export const App = () => {
@@ -239,6 +247,8 @@ export const App = () => {
         window.open(url, 'pdf')
     }
 
+    const toPx = (value: number) => convert(value, config.units, 'px')
+
     return <HStack spacing={8} width='100%' height='100%'>
         <VStack>
             <h2>Page & Print</h2>
@@ -277,30 +287,30 @@ export const App = () => {
             </HStack>
             <Switch>
                 <Match when={config.view.face == 'front'}>
-                    <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
+                    <FaceComponent id='front-face' face={config.face.front} width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'front')} />
                 </Match>
                 <Match when={config.view.face == 'back'}>
                     <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
                     <Show when={!config.face.back.sameAsFront}>
-                        <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+                        <FaceComponent id='back-face' face={config.face.back}  width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'back')}/>
                     </Show>
                 </Match>
                 <Match when={config.view.face == 'top'}>
-                    <FaceComponent id='top-face' face={config.face.top} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'top')} />
+                    <FaceComponent id='top-face' face={config.face.top}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'top')} />
                 </Match>
                 <Match when={config.view.face == 'bottom'}>
                     <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
                     <Show when={!config.face.bottom.sameAsTop}>
-                        <FaceComponent id='bottom-face' face={config.face.bottom} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
+                        <FaceComponent id='bottom-face' face={config.face.bottom}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
                     </Show>
                 </Match>
                 <Match when={config.view.face == 'left'}>
-                    <FaceComponent id='left-face' face={config.face.left} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'left')} />
+                    <FaceComponent id='left-face' face={config.face.left}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'left')} />
                 </Match>
                 <Match when={config.view.face == 'right'}>
                     <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
                     <Show when={!config.face.right.sameAsLeft}>
-                        <FaceComponent id='right-face' face={config.face.right} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'right')}/>
+                        <FaceComponent id='right-face' face={config.face.right}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'right')}/>
                     </Show>
                 </Match>
             </Switch>

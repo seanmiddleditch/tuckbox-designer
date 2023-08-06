@@ -47,12 +47,12 @@ interface ColorPickerProps {
 export const ColorPicker: Component<ColorPickerProps> = props => {
     const [isColorOpen, setColorOpen] = createSignal(false)
 
-    const button = () => <InputAdornment position='start'><ColorButton color={props.color} onClick={() => setColorOpen(true)} /></InputAdornment>
+    const button = () => <InputAdornment position='end'><ColorButton color={props.color} onClick={() => setColorOpen(true)} /></InputAdornment>
 
     return <>
         <FormControl size='small' variant='outlined'>
             <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
-            <OutlinedInput id={props.id} disabled label={props.label} value={colorToString(props.color)} startAdornment={button()} />
+            <OutlinedInput id={props.id} disabled label={props.label} value={colorToString(props.color)} endAdornment={button()} />
         </FormControl>
         <Modal open={isColorOpen()} onClose={() => setColorOpen(false)}>
             <Box sx={{

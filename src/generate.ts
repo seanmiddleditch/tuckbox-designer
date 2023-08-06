@@ -38,8 +38,8 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     const offset = size.depth + Math.max(size.depth, size.width * 0.3)
-    const back = { x: offset, y: offset, width: size.width, height: size.height }
-    const front = { x: back.x + back.width + size.depth, y: back.y, width: size.width, height: size.height }
+    const front = { x: offset, y: offset, width: size.width, height: size.height }
+    const back = { x: front.x + front.width + size.depth, y: front.y, width: size.width, height: size.height }
 
     const lineWidth = 1
     const foldDash = [0.1 * 72.0, 0.05 * 72.0] // quarter inch and tenth of inch, at 72 DPI
@@ -50,97 +50,97 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
     const pathOutline = () => {
         // top
-        ctx.moveTo(back.x, back.y - size.depth * 0.6)
-        ctx.lineTo(back.x, back.y - size.depth)
-        ctx.arc(back.x + size.width * 0.2, back.y - size.depth, size.width * 0.2, Math.PI, Math.PI * 1.5)
-        ctx.arc(back.x + size.width - size.width * 0.2, back.y - size.depth, size.width * 0.2, Math.PI * 1.5, Math.PI * 2)
-        ctx.lineTo(back.x + size.width, back.y - size.depth * 0.6)
+        ctx.moveTo(front.x, front.y - size.depth * 0.6)
+        ctx.lineTo(front.x, front.y - size.depth)
+        ctx.arc(front.x + size.width * 0.2, front.y - size.depth, size.width * 0.2, Math.PI, Math.PI * 1.5)
+        ctx.arc(front.x + size.width - size.width * 0.2, front.y - size.depth, size.width * 0.2, Math.PI * 1.5, Math.PI * 2)
+        ctx.lineTo(front.x + size.width, front.y - size.depth * 0.6)
 
         // left (top)
-        ctx.arc(back.x + back.width + size.depth * 0.5, back.y - size.depth * 0.1, size.depth * 0.5, Math.PI * 1.5, Math.PI * 2)
-        ctx.lineTo(front.x, front.y)
+        ctx.arc(front.x + front.width + size.depth * 0.5, front.y - size.depth * 0.1, size.depth * 0.5, Math.PI * 1.5, Math.PI * 2)
+        ctx.lineTo(back.x, back.y)
     
-        // front (top)
-        ctx.lineTo(front.x + front.width * 0.5 - front.width * 0.15, front.y)
-        ctx.arc(front.x + front.width * 0.5, front.y, front.width * 0.15, Math.PI, 0, true)
-        ctx.lineTo(front.x + front.width, front.y)
+        // back (top)
+        ctx.lineTo(back.x + back.width * 0.5 - back.width * 0.15, back.y)
+        ctx.arc(back.x + back.width * 0.5, back.y, back.width * 0.15, Math.PI, 0, true)
+        ctx.lineTo(back.x + back.width, back.y)
     
         // inner right
-        ctx.lineTo(front.x + front.width + size.depth * 0.8, front.y)
-        ctx.lineTo(front.x + front.width + size.depth * 0.8, front.y + size.height)
-        ctx.lineTo(front.x + front.width, front.y + size.height)
+        ctx.lineTo(back.x + back.width + size.depth * 0.8, back.y)
+        ctx.lineTo(back.x + back.width + size.depth * 0.8, back.y + size.height)
+        ctx.lineTo(back.x + back.width, back.y + size.height)
 
-        // front (bottom)
-        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.8)
-        ctx.lineTo(front.x, front.y + front.height + size.depth * 0.8)
+        // back (bottom)
+        ctx.lineTo(back.x + back.width, back.y + back.height + size.depth * 0.8)
+        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.8)
 
         // left (bottom)
-        ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
-        ctx.lineTo(back.x + back.width, back.y + size.height + size.depth * 0.6)
+        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
+        ctx.lineTo(front.x + front.width, front.y + size.height + size.depth * 0.6)
 
         // inner bottom
-        ctx.lineTo(back.x + back.width, back.y + back.height + size.depth)
-        ctx.lineTo(back.x, back.y + back.height + size.depth)
-        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
+        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
+        ctx.lineTo(front.x, front.y + front.height + size.depth)
+        ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
         
         // right
-        ctx.lineTo(back.x - size.depth, back.y + back.height + size.depth * 0.6)
-        ctx.lineTo(back.x - size.depth, back.y)
-        ctx.arc(back.x - size.depth * 0.5, back.y - size.depth * 0.1, size.depth * 0.5, Math.PI, Math.PI * 1.5)
-        ctx.lineTo(back.x, back.y - size.depth * 0.6)
+        ctx.lineTo(front.x - size.depth, front.y + front.height + size.depth * 0.6)
+        ctx.lineTo(front.x - size.depth, front.y)
+        ctx.arc(front.x - size.depth * 0.5, front.y - size.depth * 0.1, size.depth * 0.5, Math.PI, Math.PI * 1.5)
+        ctx.lineTo(front.x, front.y - size.depth * 0.6)
     }
 
     const pathCuts = () => {
-        ctx.moveTo(back.x, back.y - size.depth)
-        ctx.lineTo(back.x + back.width * 0.1, back.y - size.depth)
+        ctx.moveTo(front.x, front.y - size.depth)
+        ctx.lineTo(front.x + front.width * 0.1, front.y - size.depth)
 
-        ctx.moveTo(back.x + back.width, back.y - size.depth)
-        ctx.lineTo(back.x + back.width * 0.9, back.y - size.depth)
+        ctx.moveTo(front.x + front.width, front.y - size.depth)
+        ctx.lineTo(front.x + front.width * 0.9, front.y - size.depth)
 
-        ctx.moveTo(back.x, back.y)
-        ctx.lineTo(back.x, back.y - size.depth * 0.6)
+        ctx.moveTo(front.x, front.y)
+        ctx.lineTo(front.x, front.y - size.depth * 0.6)
 
-        ctx.moveTo(back.x + back.width, back.y)
-        ctx.lineTo(back.x + back.width, back.y - size.depth * 0.6)
+        ctx.moveTo(front.x + front.width, front.y)
+        ctx.lineTo(front.x + front.width, front.y - size.depth * 0.6)
 
-        ctx.moveTo(back.x, back.y + back.height)
-        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
+        ctx.moveTo(front.x, front.y + front.height)
+        ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
 
-        ctx.moveTo(back.x + back.width, back.y + back.height)
-        ctx.lineTo(back.x + back.width, back.y + back.height + size.depth * 0.6)
+        ctx.moveTo(front.x + front.width, front.y + front.height)
+        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
-        ctx.moveTo(front.x, front.y + front.height + size.depth * 0.6)
-        ctx.lineTo(front.x, front.y + front.height)
+        ctx.moveTo(back.x, back.y + back.height + size.depth * 0.6)
+        ctx.lineTo(back.x, back.y + back.height)
     }
 
     const pathFolds = () => {
         // inner bottom
-        ctx.moveTo(back.x, back.y + back.height)
-        ctx.lineTo(back.x + back.width, back.y + back.height)
+        ctx.moveTo(front.x, front.y + front.height)
+        ctx.lineTo(front.x + front.width, front.y + front.height)
     
         // right
-        ctx.moveTo(back.x - size.depth, back.y)
-        ctx.lineTo(back.x, back.y)
-        ctx.lineTo(back.x, back.y + size.height)
-        ctx.lineTo(back.x - size.depth, back.y + size.height)
+        ctx.moveTo(front.x - size.depth, front.y)
+        ctx.lineTo(front.x, front.y)
+        ctx.lineTo(front.x, front.y + size.height)
+        ctx.lineTo(front.x - size.depth, front.y + size.height)
     
         // left
-        ctx.moveTo(back.x + back.width, back.y)
-        ctx.lineTo(back.x + back.width + size.depth, back.y)
-        ctx.lineTo(back.x + back.width + size.depth, back.y + size.height)
-        ctx.lineTo(back.x + back.width, back.y + size.height)
-        ctx.lineTo(back.x + back.width, back.y)
-    
-        // front
         ctx.moveTo(front.x + front.width, front.y)
-        ctx.lineTo(front.x + front.width, front.y + front.height)
-        ctx.lineTo(front.x, front.y + front.height)
+        ctx.lineTo(front.x + front.width + size.depth, front.y)
+        ctx.lineTo(front.x + front.width + size.depth, front.y + size.height)
+        ctx.lineTo(front.x + front.width, front.y + size.height)
+        ctx.lineTo(front.x + front.width, front.y)
+    
+        // back
+        ctx.moveTo(back.x + back.width, back.y)
+        ctx.lineTo(back.x + back.width, back.y + back.height)
+        ctx.lineTo(back.x, back.y + back.height)
     
         // top
-        ctx.moveTo(back.x, back.y)
-        ctx.lineTo(back.x + size.width, back.y)
-        ctx.moveTo(back.x + size.width * 0.1, back.y - size.depth)
-        ctx.lineTo(back.x + size.width * 0.9, back.y - size.depth)
+        ctx.moveTo(front.x, front.y)
+        ctx.lineTo(front.x + size.width, front.y)
+        ctx.moveTo(front.x + size.width * 0.1, front.y - size.depth)
+        ctx.lineTo(front.x + size.width * 0.9, front.y - size.depth)
     }
 
     const wrapText = (text: string, w: number, lineHeight: number, cb: (t: string, y: number) => void) => {
@@ -221,50 +221,41 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         // top
         if (options.face.top.text && options.face.top.font)
-            writeLine(options.face.top.text, options.face.top.font, back.x + back.width * 0.5, back.y - size.depth * 0.5, back.width * 0.9)
+            writeLine(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, front.width * 0.9)
 
         // bottom
         if (options.face.bottom.text && options.face.bottom.font)
-            writeCenterAngle(options.face.bottom.text, options.face.bottom.font, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
+            writeCenterAngle(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, back.width * 0.9)
 
         // left
         if (options.face.left.text && options.face.left.font)
-            writeCenterAngle(options.face.left.text, options.face.left.font, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
+            writeCenterAngle(options.face.left.text, options.face.left.font, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 1.5, front.height * 0.9)
 
         // right
         if (options.face.right.text && options.face.right.font)
-            writeCenterAngle(options.face.right.text, options.face.right.font, back.x + back.width + size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 0.5, back.height * 0.9)
+            writeCenterAngle(options.face.right.text, options.face.right.font, front.x + front.width + size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height * 0.9)
     }
 
-    const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement) => {
-        let w = image.width, h = image.height
-        if (w > h) {
-            const ar = image.height / image.width
-            w = size.width
-            h = w * ar
-        }
-        else {
-            const ar = image.width / image.height
-            h = size.height
-            w = h * ar
-        }
+    const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement, r: number = 0) => {
+        ctx.save()
+        ctx.translate(tx, ty)
+        ctx.rotate(r)
+       
+        ctx.drawImage(image, 0, 0, tw, th)
 
-        w = Math.min(convert(w, 'px', 'pt'), tw)
-        h = Math.min(convert(h, 'px', 'pt'), th)
-        
-        ctx.drawImage(image, tx + (tw - w) * 0.5, ty + (th - h) * 0.5, w, h)
+        ctx.restore()
     }
 
-    // background color (overlap to handle bleed)
+    // frontground color (overlap to handle bleed)
     ctx.save()
     {
         ctx.setLineDash([])
         ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
 
-        ctx.fillRect(back.x - size.depth - bleed,
-            back.y - size.depth * 1.5 - bleed,
-            back.width + front.width + options.size.depth * 2.9 + bleed * 2,
-            back.height + size.depth * 2.5 + bleed * 2)
+        ctx.fillRect(front.x - size.depth - bleed,
+            front.y - size.depth * 1.5 - bleed,
+            front.width + back.width + options.size.depth * 2.9 + bleed * 2,
+            front.height + size.depth * 2.5 + bleed * 2)
 
         ctx.fill()
     }
@@ -328,13 +319,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             drawImage(front.x, front.y - size.depth, front.width, size.depth, options.face.top.image)
 
         if (options.face.bottom.image)
-            drawImage(front.x, front.y + front.height, front.width, size.depth, options.face.bottom.image)
+            drawImage(front.x + front.width, front.y + front.height + size.depth, front.width, size.depth, options.face.bottom.image, Math.PI)
 
         if (options.face.left.image)
-            drawImage(front.x - size.depth, front.y, size.depth, front.height, options.face.left.image)
+            drawImage(front.x - size.depth, front.y + front.height, front.height, size.depth, options.face.left.image, Math.PI * 1.5)
 
         if (options.face.right.image)
-            drawImage(back.x - size.depth, back.y, size.depth, back.height, options.face.right.image)
+            drawImage(back.x, back.y, back.height, size.depth, options.face.right.image, Math.PI * 0.5)
     }
     ctx.restore()
 
