@@ -30,6 +30,8 @@
     "@suid/icons-material": "^0.6.9",
     "@suid/material": "^0.14.2",
     "@suid/vite-plugin": "^0.1.4",
+    "cropperjs": "^1.5.13",
+    "deepmerge-ts": "^5.1.0",
     "jspdf": "^2.5.1",
     "lodash-es": "^4.17.21",
     "solid-color": "^0.0.4",
@@ -37,6 +39,7 @@
     "tinycolor2": "^1.6.0"
   },
   "devDependencies": {
+    "ts-essentials": "^9.3.2",
     "vite": "^4.4.7",
     "vite-plugin-solid": "^2.7.0"
   }

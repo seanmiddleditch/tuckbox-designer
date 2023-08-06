@@ -1,8 +1,17 @@
-import { Button, Modal, Box, TextField, InputAdornment } from '@suid/material'
+import { Button, Modal, Box, TextField, InputAdornment, FormControl, OutlinedInput, FormControlLabel, InputLabel } from '@suid/material'
+import { Component } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { ChromePicker } from 'solid-color'
+import { RGB } from '../types'
 
-const ColorButton = props => <Button onClick={props.onClick} sx={{ padding: 0, 'min-width': 0 }}>
+interface ColorButtonsProps {
+    color: RGB,
+    onClick: (e: any) => void
+}
+
+const colorToString = (rgb: RGB) => `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+
+const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} style={{ padding: 0, 'min-width': 0 }}>
     <div style={{
         'width': '1.5em',
         'height': '1.5em',
@@ -17,8 +26,8 @@ const ColorButton = props => <Button onClick={props.onClick} sx={{ padding: 0, '
             'border-radius': 'inherit',
             'width': '100%',
             'height': '100%',
-            'background-color': props.color,
-            'border-color': props.color,
+            'background-color': colorToString(props.color),
+            'border-color': colorToString(props.color),
             'border-width': '2px',
             'border-style': 'solid',
             'position': 'relative',
@@ -28,33 +37,35 @@ const ColorButton = props => <Button onClick={props.onClick} sx={{ padding: 0, '
     </div>
 </Button>
 
-export const ColorPicker = props => {
+interface ColorPickerProps {
+    id: string
+    color: RGB
+    label: string
+    onChange: (value: RGB) => void
+}
+
+export const ColorPicker: Component<ColorPickerProps> = props => {
     const [isColorOpen, setColorOpen] = createSignal(false)
 
-    const alphify = color => color.hex + ('0' + Math.round(color.rgb.a * 255).toString(16)).slice(-2)
+    const button = () => <InputAdornment position='end'><ColorButton color={props.color} onClick={() => setColorOpen(true)} /></InputAdornment>
 
     return <>
-        <TextField
-            size='small' variant='outlined'
-            id='color'
-            label={props.label}
-            value={props.color}
-            InputProps={{
-                endAdornment: () => <InputAdornment position='end'><ColorButton color={props.color} onChange={props.onChange} onClick={() => setColorOpen(true)} /></InputAdornment>,
-            }}/>
+        <FormControl size='small' variant='outlined'>
+            <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
+            <OutlinedInput id={props.id} disabled label={props.label} value={colorToString(props.color)} endAdornment={button()} />
+        </FormControl>
         <Modal open={isColorOpen()} onClose={() => setColorOpen(false)}>
             <Box sx={{
                 position: "absolute",
                 top: "50%",
                 left: "50%",
                 transform: "translate(-50%, -50%)",
-                width: 400,
                 bgcolor: 'background.paper',
                 border: "2px solid #000",
                 boxShadow: "24px",
                 p: 4,
             }}>
-                <ChromePicker color={props.color} onChangeComplete={color => props.onChange(alphify(color)) } />
+                <ChromePicker color={props.color} disableAlpha onChange={color => props.onChange(color.rgb) } />
             </Box>
         </Modal>
     </>
