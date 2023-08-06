@@ -8,7 +8,7 @@ import PDFDocument from 'jspdf'
 import { Button } from './components/button'
 import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
-import { Toggle } from './components/toggle'
+import { ToggleButton } from './components/toggle-button'
 import { ColorPicker } from './components/color-picker'
 import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
@@ -21,11 +21,17 @@ import patchJsPdf from './jspdf-patch'
 import '@suid/material'
 import { ToggleSwitch } from './components/toggle-switch'
 
+type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
+
 interface Config {
     units: Units,
     page: PaperFormats,
     title: string,
     color: string,
+    view: {
+        preview: 'canvas' | 'pdf',
+        face: Faces
+    }
     face: {
         front: Face,
         back: Face & { sameAsFront: boolean },
@@ -62,6 +68,10 @@ const defualtConfig: Config = {
     page: 'letter',
     title: 'Sample',
     color: '#ffffff00',
+    view: {
+        preview: 'canvas',
+        face: 'front',
+    },
     face: {
         front: { ...defaultFace, text: 'Sample' },
         back: { sameAsFront: true, ...defaultFace },
@@ -76,8 +86,6 @@ const defualtConfig: Config = {
         depth: 1.0
     },
 }
-
-type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
 
 const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units, setValue: (values: DeepPartial<Face>) => void }) => 
     <VStack alignItems='flex-start'>
@@ -97,8 +105,6 @@ const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [imageCache, setImageCache] = createStore<FaceImageCache>({})
-    const [currentFace, setCurrentFace] = createSignal<Faces>('front')
-    const [preview, setPreview] = createSignal('canvas')
 
     let pageDetailsRef: HTMLDivElement|undefined = undefined
     let canvasRef: HTMLCanvasElement|undefined = undefined
@@ -166,26 +172,7 @@ export const App = () => {
             }
         })
     }
-
-    createEffect(() => {
-        if (preview() != 'canvas')
-            return
-        
-        // page dimensions
-        const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
-
-        pageDetailsRef!.textContent = `${config.page} ${pageSize[0]}x${pageSize[1]}${config.units}`
-
-        const canvas = canvasRef!
-        canvas.width = convert(pageSize[0], config.units, 'pt')
-        canvas.height = convert(pageSize[1], config.units, 'pt')
-
-        const ctx = canvas.getContext("2d")!
-        ctx.clearRect(0, 0, canvas.width, canvas.height)
-
-        drawToCanvas(ctx)
-    })
-
+    
     const generatePdfBlob = () => {
         const doc = new PDFDocument({
             orientation: 'landscape',
@@ -213,13 +200,27 @@ export const App = () => {
     }
 
     createEffect(() => {
-        if (preview() != 'pdf')
-            return
-        
-        const blob = generatePdfBlob()
-        const url = makeDataUrl(blob)
+        if (config.view.preview == 'canvas') {
+            // page dimensions
+            const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
 
-        previewFrameRef!.src = url
+            pageDetailsRef!.textContent = `${config.page} ${pageSize[0]}x${pageSize[1]}${config.units}`
+
+            const canvas = canvasRef!
+            canvas.width = convert(pageSize[0], config.units, 'pt')
+            canvas.height = convert(pageSize[1], config.units, 'pt')
+
+            const ctx = canvas.getContext("2d")!
+            ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+            drawToCanvas(ctx)
+        }
+        else if (config.view.preview == 'pdf') {
+            const blob = generatePdfBlob()
+            const url = makeDataUrl(blob)
+    
+            previewFrameRef!.src = url
+        }
     })
 
     const savePdf = () => {
@@ -265,38 +266,38 @@ export const App = () => {
             </VStack>
             <HStack alignItems='baseline'>
                 <h2>Faces</h2>
-                <Toggle.Group value={currentFace()} onChange={setCurrentFace} style={{ height: '2.5em', 'vertical-align': 'end' }}>
-                    <Toggle.Button value='front'>Front</Toggle.Button>
-                    <Toggle.Button value='back'>Back</Toggle.Button>
-                    <Toggle.Button value='top'>Top</Toggle.Button>
-                    <Toggle.Button value='bottom'>Bottom</Toggle.Button>
-                    <Toggle.Button value='left'>Left</Toggle.Button>
-                    <Toggle.Button value='right'>Right</Toggle.Button>
-                </Toggle.Group>
+                <ToggleButton value={config.view.face} onChange={value => setConfig('view', 'face', value)} style={{ height: '2.5em', 'vertical-align': 'end' }}>
+                    <ToggleButton.Item value='front'>Front</ToggleButton.Item>
+                    <ToggleButton.Item value='back'>Back</ToggleButton.Item>
+                    <ToggleButton.Item value='top'>Top</ToggleButton.Item>
+                    <ToggleButton.Item value='bottom'>Bottom</ToggleButton.Item>
+                    <ToggleButton.Item value='left'>Left</ToggleButton.Item>
+                    <ToggleButton.Item value='right'>Right</ToggleButton.Item>
+                </ToggleButton>
             </HStack>
             <Switch>
-                <Match when={currentFace() == 'front'}>
+                <Match when={config.view.face == 'front'}>
                     <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
                 </Match>
-                <Match when={currentFace() == 'back'}>
+                <Match when={config.view.face == 'back'}>
                     <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
                     <Show when={!config.face.back.sameAsFront}>
                         <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
                     </Show>
                 </Match>
-                <Match when={currentFace() == 'top'}>
+                <Match when={config.view.face == 'top'}>
                     <FaceComponent id='top-face' face={config.face.top} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'top')} />
                 </Match>
-                <Match when={currentFace() == 'bottom'}>
+                <Match when={config.view.face == 'bottom'}>
                     <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
                     <Show when={!config.face.bottom.sameAsTop}>
                         <FaceComponent id='bottom-face' face={config.face.bottom} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
                     </Show>
                 </Match>
-                <Match when={currentFace() == 'left'}>
+                <Match when={config.view.face == 'left'}>
                     <FaceComponent id='left-face' face={config.face.left} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'left')} />
                 </Match>
-                <Match when={currentFace() == 'right'}>
+                <Match when={config.view.face == 'right'}>
                     <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
                     <Show when={!config.face.right.sameAsLeft}>
                         <FaceComponent id='right-face' face={config.face.right} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'right')}/>
@@ -318,15 +319,15 @@ export const App = () => {
         <VStack width='100%' alignItems='flex-start'>
             <HStack alignItems='baseline'>
                 <h2>Preview</h2>
-                <Toggle.Group exclusive style={{ height: '2.5em', 'vertical-align': 'end' }} value={preview()} onChange={value => setPreview(value)}>
-                    <Toggle.Button value='canvas'>Canvas</Toggle.Button>
-                    <Toggle.Button value='pdf'>PDF</Toggle.Button>
-                </Toggle.Group>
+                <ToggleButton exclusive style={{ height: '2.5em', 'vertical-align': 'end' }} value={config.view.preview} onChange={value => setConfig('view', 'preview', value)}>
+                    <ToggleButton.Item value='canvas'>Canvas</ToggleButton.Item>
+                    <ToggleButton.Item value='pdf'>PDF</ToggleButton.Item>
+                </ToggleButton>
             </HStack>
             <Switch fallback={<>
                 <canvas width="800" height="600" ref={canvasRef} style={{ border: '1px solid grey' }}></canvas>
             </>}>
-                <Match when={preview() == 'pdf'}>
+                <Match when={config.view.preview == 'pdf'}>
                     <iframe width="800" height="600" ref={previewFrameRef} style={{ border: 'none', width: '100%' }}></iframe>
                 </Match>
             </Switch>
