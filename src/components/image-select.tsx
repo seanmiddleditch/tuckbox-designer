@@ -3,6 +3,10 @@ import 'cropperjs/dist/cropper.css'
 import { Button, ButtonGroup, Modal, Box } from '@suid/material'
 import { createSignal, createEffect, onCleanup, Component } from 'solid-js'
 import Cropper from 'cropperjs'
+import { HStack, VStack } from './stack'
+import { NumberInput } from './number-input'
+import { createStore } from 'solid-js/store'
+import { Rotate90DegreesCwRounded, Rotate90DegreesCcwRounded, SwapHorizRounded, SwapVertRounded } from '@suid/icons-material'
 
 interface ImageSelectProps {
     id: string,
@@ -13,71 +17,88 @@ interface ImageSelectProps {
     onChange: (value: HTMLCanvasElement) => void
 }
 
+interface ImageSelectStore {
+    open: boolean
+    cropper?: Cropper
+    file?: File
+    img?: HTMLImageElement
+    size: { width: number, height: number }
+    scale: { x: number, y: number }
+}
+
 export const ImageSelect: Component<ImageSelectProps> = props => {
-    const [isCropperOpen, setCropperOpen] = createSignal(false)
-    const [cropperInst, setCropperInst] = createSignal<Cropper|null>(null)
-    const [imageFile, setImageFile] = createSignal<File|null>(null)
+    const [store, setStore] = createStore<ImageSelectStore>({
+        open: false,
+        size: { width: 0, height: 0 },
+        scale: { x: 1, y: 1 }
+    })
 
-    const [imageRef, setImageRef] = (() => {
-        const [ref, setRef] = createSignal<HTMLImageElement|null>(null)
-
-        const setter = (img: HTMLImageElement) => {
-            setRef(img)
-
-            const cropper = new Cropper(img, { aspectRatio: 4 / 3, dragMode: 'move' })
-            
-            if (props.imageWidth !== undefined && props.imageHeight !== undefined)
-                cropper.setAspectRatio(props.imageWidth / props.imageHeight)
+    var fileRef: HTMLInputElement | undefined = undefined
     
-            setCropperInst(cropper)
-        }
-
-        return [ref, setter]
-    })()
-
-    var fileRef: HTMLInputElement|undefined = undefined
+    const aspectRatio = (props.imageWidth !== undefined && props.imageHeight !== undefined) ?
+        (props.imageWidth / props.imageHeight ): (4 / 3)
 
     onCleanup(() => {
-        const cropper = cropperInst()
-        if (cropper)
-            cropper.destroy()
+        if (store.cropper)
+            store.cropper.destroy()
     })
     
     const onSelectImage = (file: File) => {
-        setImageFile(file)
-        setCropperOpen(!!file)
+        setStore({ file, open: true })
+    }
+
+    const onCrop = () => {
+        if (store.cropper) {
+            const data = store.cropper.getImageData()
+            console.log(data)
+            setStore({ size: { width: Math.round(data.width), height: Math.round(data.height) }})
+        }
     }
 
     createEffect(() => {
-        const cropper = cropperInst()
-        if (!cropper)
-            return
-        
-        const file = imageFile()
-        if (!file)
+        if (!store.file)
             return
 
-        const img = imageRef()
-        if (!img)
+        if (!store.img)
             return
 
-        img.onload = () => URL.revokeObjectURL(img.src)
-        img.src = URL.createObjectURL(file)
+        const img = store.img
+        img.onload = () => {
+            let cropper = store.cropper
+            if (!cropper)
+                cropper = new Cropper(img, { aspectRatio, dragMode: 'move' })
+            else
+                cropper.replace(img.src)
 
-        cropper.replace(img.src)
+            img.removeEventListener('crop', onCrop)
+            img.addEventListener('crop', onCrop)
+    
+            setStore({ cropper })
+            URL.revokeObjectURL(img.src)
+        }
+        img.src = URL.createObjectURL(store.file)
+    })
 
+    createEffect(() => {
+        if (store.cropper) {
+            store.cropper.scaleX(store.scale.x)
+            store.cropper.scaleY(store.scale.y)
+        }
     })
 
     const onFinishCrop = () => {
-        const cropper = cropperInst()
+        const cropper = store.cropper
+        if (!cropper)
+            return
 
-        const image = cropper!.getCroppedCanvas({
+        const image = cropper.getCroppedCanvas({
             maxWidth: props.imageWidth || 400,
             maxHeight: props.imageHeight || 300,
         })
         props.onChange(image)
 
-        setCropperOpen(false)
+        cropper.destroy()
+        setStore({ open: false, file: undefined, cropper: undefined })
     }
 
     return <>
@@ -85,19 +106,38 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
         <ButtonGroup>
             <Button size='small' variant='contained' onClick={e => fileRef!.click()}>{props.label ?? 'Image'}</Button>
         </ButtonGroup>
-        <Modal open={isCropperOpen()} onClose={onFinishCrop}>
+        <Modal open={store.open} onClose={onFinishCrop}>
             <Box sx={{
                     position: "absolute",
                     top: "50%",
                     left: "50%",
                     transform: "translate(-50%, -50%)",
-                    width: 800,
                     bgcolor: 'background.paper',
                     border: "2px solid #000",
                     boxShadow: "24px",
                     p: 4,
             }}>
-                <img ref={setImageRef} style='position: relative; max-width: 740'></img>
+                <HStack>
+                    <VStack alignItems='center'>
+                        <img ref={img => setStore({ img })} style={{ 'height': '600px', 'min-width': '600px' }}></img>
+                        <HStack>
+                            <ButtonGroup>
+                                <Button onClick={() => store.cropper?.rotate(+90)}><Rotate90DegreesCwRounded/></Button>
+                                <Button onClick={() => store.cropper?.rotate(-90)}><Rotate90DegreesCcwRounded/></Button>
+                            </ButtonGroup>
+                            <ButtonGroup>
+                                <Button onClick={() => setStore('scale', 'x', store.scale.x * -1)}><SwapHorizRounded/></Button>
+                                <Button onClick={() => setStore('scale', 'y', store.scale.y * -1)}><SwapVertRounded/></Button>
+                            </ButtonGroup>
+                        </HStack>
+                    </VStack>
+                    <VStack>
+                        <h2>Source</h2>
+                        <NumberInput id='img-width' label='Width' units='px' disabled controlled value={store.size.width} onChange={value => setStore('size', 'width', value)} />
+                        <NumberInput id='img-height' label='Height' units='px' disabled controlled value={store.size.height} onChange={value => setStore('size', 'height', value)} />
+                        <h2>Actions</h2>
+                    </VStack>
+                </HStack>
             </Box>
         </Modal>
     </>
