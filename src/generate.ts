@@ -1,20 +1,36 @@
-import { Context2d } from 'jspdf'
-import { mm2pt } from './convert'
+import { mm2pt, convert } from './convert'
+import { Size, Font } from './types'
 
-interface DeckSize {
-    width: number,
-    height: number,
-    depth: number
+export interface FaceOptions {
+    text?: string,
+    font?: Font,
+    image?: HTMLImageElement,
 }
 
-export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: string, bgColor: string, font: string) {
+export interface GenerateOptions {
+    size: Size,
+    color: string,
+    face: {
+        front: FaceOptions,
+        back: FaceOptions,
+    }
+}
+
+const defaultText = 'Sample'
+const defaultFont: Font = {
+    family: 'Times-Roman',
+    size: 14,
+    weight: 700
+}
+
+export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
     // expand size to account for paper thickness
     const thickness = mm2pt(0.4)
     const bleed = mm2pt(3)
     const size = {
-        width: deck.width + thickness,
-        height: deck.height + thickness,
-        depth: deck.depth + thickness
+        width: options.size.width + thickness,
+        height: options.size.height + thickness,
+        depth: options.size.depth + thickness
     }
 
     const offset = size.depth + Math.max(size.depth, size.width * 0.3)
@@ -23,6 +39,10 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
 
     const lineWidth = 1
     const foldDash = [0.1 * 72.0, 0.05 * 72.0] // quarter inch and tenth of inch, at 72 DPI
+
+    const setFont = (font: Font) => {
+        ctx.font = `${Math.round(font.weight)} ${Math.round(font.size)}pt ${font.family}`
+    }
 
     const pathOutline = () => {
         // top
@@ -147,12 +167,16 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
             cb(line, yOffset)
     }
 
-    const writeLine = (text: string, x: number, y: number, w: number) => {
+    const writeLine = (text: string, font: Font, x: number, y: number, w: number) => {
+        ctx.save()
+        setFont(font)
         wrapText(text, w, 20, (line, yOffset) => ctx.fillText(line, x, y + yOffset, w))
+        ctx.restore()
     }
 
-    const writeCenterAngle = (text: string, x: number, y: number, r: number, w: number) => {
+    const writeCenterAngle = (text: string, font: Font, x: number, y: number, r: number, w: number) => {
         ctx.save()
+        setFont(font)
         ctx.translate(x, y)
         ctx.rotate(r)
 
@@ -184,33 +208,54 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
 
     const drawText = () => {
         // front
-        writeLine(title, front.x + front.width * 0.5, front.y + front.height * 0.25, front.width * 0.9)
+        if (options.face.front.text && options.face.front.font)
+            writeLine(options.face.front.text, options.face.front.font, front.x + front.width * 0.5, front.y + front.height * 0.25, front.width * 0.9)
 
         // back
-        writeLine(title, back.x + back.width * 0.5, back.y + back.height * 0.25, back.width * 0.9)
+        if (options.face.back.text && options.face.back.font)
+            writeLine(options.face.back.text, options.face.back.font, back.x + back.width * 0.5, back.y + back.height * 0.25, back.width * 0.9)
 
         // top
-        writeLine(title, back.x + back.width * 0.5, back.y - size.depth * 0.5, back.width * 0.9)
+        writeLine(defaultText, defaultFont, back.x + back.width * 0.5, back.y - size.depth * 0.5, back.width * 0.9)
 
         // bottom
-        writeCenterAngle(title, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
+        writeCenterAngle(defaultText, defaultFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
 
         // side A
-        writeCenterAngle(title, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
+        writeCenterAngle(defaultText, defaultFont, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
 
         // side B
-        writeCenterAngle(title, back.x + back.width + size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 0.5, back.height * 0.9)
+        writeCenterAngle(defaultText, defaultFont, back.x + back.width + size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 0.5, back.height * 0.9)
+    }
+
+    const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement) => {
+        let w = image.width, h = image.height
+        if (w > h) {
+            const ar = image.height / image.width
+            w = size.width
+            h = w * ar
+        }
+        else {
+            const ar = image.width / image.height
+            h = size.height
+            w = h * ar
+        }
+
+        w = Math.min(convert(w, 'px', 'pt'), tw)
+        h = Math.min(convert(h, 'px', 'pt'), th)
+        
+        ctx.drawImage(image, tx + (tw - w) * 0.5, ty + (th - h) * 0.5, w, h)
     }
 
     // background color (overlap to handle bleed)
     ctx.save()
-    if (bgColor && bgColor != '#ffffff00') {
+    if (options.color && options.color != '#ffffff00') {
         ctx.setLineDash([])
-        ctx.fillStyle = bgColor
+        ctx.fillStyle = options.color
 
         ctx.fillRect(back.x - size.depth - bleed,
             back.y - size.depth * 1.5 - bleed,
-            back.width + front.width + deck.depth * 2.9 + bleed * 2,
+            back.width + front.width + options.size.depth * 2.9 + bleed * 2,
             back.height + size.depth * 2.5 + bleed * 2)
 
         ctx.fill()
@@ -262,12 +307,21 @@ export function generate(ctx: CanvasRenderingContext2D, deck: DeckSize, title: s
     }
     ctx.restore()
 
+    // images
+    ctx.save()
+    {
+        if (options.face.front.image)
+            drawImage(front.x, front.y, front.width, front.height, options.face.front.image)
+
+            if (options.face.back.image)
+            drawImage(back.x, back.y, back.width, back.height, options.face.back.image)
+    }
+    ctx.restore()
+
     // text labels
     ctx.save()
     {
         ctx.beginPath()
-
-        ctx.font = font
         ctx.fillStyle = '#000000'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'

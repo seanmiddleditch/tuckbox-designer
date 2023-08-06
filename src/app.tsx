@@ -1,4 +1,5 @@
-import { createEffect, createSignal, Switch, Match } from 'solid-js'
+import { createEffect, createSignal, Switch, Match, Show } from 'solid-js'
+import { SetStoreFunction, createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
 import { generate } from './generate'
@@ -13,32 +14,39 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
 import { Download as DownloadIcon } from '@suid/icons-material'
+import { DeepPartial } from 'ts-essentials'
+import { Font, Size, Face } from './types'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
-
-interface Font {
-    family: string
-    size: number
-    weight: number
-}
-
-interface Size {
-    width: number
-    height: number
-    depth: number
-}
+import { ToggleSwitch } from './components/toggle-switch'
 
 interface Config {
     units: Units,
     page: PaperFormats,
     title: string,
     color: string,
-    font: Font,
-    image: {
-        front: string
+    face: {
+        front: Face,
+        back: Face & { sameAsFront: boolean }
     },
     size: Size
+}
+
+interface FaceImageCache {
+    front?: HTMLImageElement,
+    back?: HTMLImageElement
+}
+
+const defaultFont: Font = {
+    family: 'Times-Roman',
+    size: 18,
+    weight: 700,
+}
+
+const defaultFace: Face = {
+    text: '',
+    font: defaultFont,
 }
 
 const defualtConfig: Config = {
@@ -46,13 +54,9 @@ const defualtConfig: Config = {
     page: 'letter',
     title: 'Sample',
     color: '#ffffff00',
-    font: {
-        family: 'Times-Roman',
-        size: 18,
-        weight: 700,
-    },
-    image: {
-        front: ''
+    face: {
+        front: { ...defaultFace, text: 'Sample' },
+        back: { sameAsFront: true, ...defaultFace },
     },
     size: {
         width: 2.25,
@@ -61,28 +65,25 @@ const defualtConfig: Config = {
     },
 }
 
+const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units, setValue: (values: DeepPartial<Face>) => void }) => 
+    <VStack alignItems='flex-start'>
+        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.face.text} onChange={value => props.setValue({ text: value })} />
+        <HStack>
+            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.face.font.family} onChange={value => props.setValue({ font: { family: value } })}>
+                <Select.Item value='Courier'>Courier</Select.Item>
+                <Select.Item value='Helvetica'>Helvetica</Select.Item>
+                <Select.Item value='Times-Roman'>Times Roman</Select.Item>
+            </Select>
+            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' value={props.face.font.size} onChange={value => props.setValue({ font: { size: value } })} />
+            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={value => props.setValue({ font: { weight: value } })} />
+        </HStack>
+        <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={convert(props.size.width, props.units, 'px')} imageHeight={convert(props.size.height, props.units, 'px')} onChange={image => props.setValue({ image: image.toDataURL() })}/>
+    </VStack>
+
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
+    const [imageCache, setImageCache] = createStore<FaceImageCache>({})
     const [preview, setPreview] = createSignal('canvas')
-
-    const imageFront = (() => {
-        const [getter, setImage] = createSignal<HTMLImageElement|null>(null)
-            
-        createEffect(() => {
-            if (config.image.front != '') {
-                const img = new Image()
-                img.onload = () => {
-                    setImage(img)
-                }
-                img.src = config.image.front
-            }
-            else {
-                setImage(null!)
-            }
-        })
-
-        return getter
-    })()
 
     let pageDetailsRef: HTMLDivElement|undefined = undefined
     let canvasRef: HTMLCanvasElement|undefined = undefined
@@ -90,13 +91,57 @@ export const App = () => {
     let data_url: string = ''
     let previewFrameRef: HTMLIFrameElement|undefined = undefined
 
-    const fontName = () => `${config.font.weight} ${config.font.size}pt ${config.font.family}`
-
     const resetConfig = () => {
         if (confirm('Reset all configuration?')) {
             localStorage.clear()
             setConfig(defualtConfig)
         }
+    }
+    
+    createEffect(() => {
+        const op = (face: Face, name: 'front' | 'back') => {
+            if (face.image) {
+                const img = new Image()
+                img.onload = () => setImageCache({ [name]: img })
+                img.src = face.image
+            }
+            else {
+                setImageCache({ [name]: undefined })
+            }
+        }
+
+        op(config.face.front, 'front')
+        op(config.face.back, 'back')
+    })
+
+    const drawToCanvas = (ctx: CanvasRenderingContext2D) => {
+        const size = {
+            width: convert(config.size.width, config.units, 'pt'),
+            height: convert(config.size.height, config.units, 'pt'),
+            depth: convert(config.size.depth, config.units, 'pt')
+        }
+
+        console.log({ ...config }, { ...config.face }, { ...config.face.back })
+
+        const front = {
+            font: { ...config.face.front.font },
+            text: config.face.front.text,
+            image: imageCache.front
+        }
+        const back = config.face.back.sameAsFront ? front : {
+            font: { ...config.face.back.font },
+            text: config.face.back.text,
+            image: imageCache.back
+        }
+
+        generate(ctx, {
+            size,
+            color: config.color,
+            face: {
+                front,
+                back
+            }
+        })
     }
 
     createEffect(() => {
@@ -112,45 +157,13 @@ export const App = () => {
         canvas.width = convert(pageSize[0], config.units, 'pt')
         canvas.height = convert(pageSize[1], config.units, 'pt')
 
-        const size = {
-            width: convert(config.size.width, config.units, 'pt'),
-            height: convert(config.size.height, config.units, 'pt'),
-            depth: convert(config.size.depth, config.units, 'pt')
-        }
-
         const ctx = canvas.getContext("2d")!
         ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-        generate(ctx, size, config.title, config.color, fontName())
-
-        const front = imageFront()
-        if (front) {
-            let w = front.width, h = front.height
-            if (w > h) {
-                const ar = front.height / front.width
-                w = size.width
-                h = w * ar
-            }
-            else {
-                const ar = front.width / front.height
-                h = size.height
-                w = h * ar
-            }
-
-            w = convert(w, 'px', 'pt')
-            h = convert(h, 'px', 'pt')
-                
-            ctx.drawImage(front, size.depth * 2 + size.width * 0.5 - w * 0.5, size.depth * 2 + size.height * 0.5 - h * 0.5, w, h)
-        }
+        drawToCanvas(ctx)
     })
 
     const generatePdfBlob = () => {
-        const size = {
-            width: convert(config.size.width, config.units, 'pt'),
-            height: convert(config.size.height, config.units, 'pt'),
-            depth: convert(config.size.depth, config.units, 'pt')
-        }
-
         const doc = new PDFDocument({
             orientation: 'landscape',
             unit: 'pt',
@@ -159,7 +172,7 @@ export const App = () => {
 
         const ctx = patchJsPdf(doc.canvas.getContext("2d"))
         
-        generate(ctx, size, config.title, config.color, fontName())
+        drawToCanvas(ctx)
 
         const bytes = doc.output('blob')
         const blob = new Blob([bytes], { type: 'application/pdf' })
@@ -217,32 +230,26 @@ export const App = () => {
                     <Select.Item value='pt'>points</Select.Item>
                 </Select>
             </HStack>
-            <h2>Deck Size</h2>
+            <h2>Deck Setup</h2>
             <VStack alignItems='flex-start'>
                 <HStack>
                     <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
                     <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
                     <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                 </HStack>
-            </VStack>
-            <h2>Design</h2>
-            <VStack alignItems='flex-start'>
+                <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
                 <ColorPicker label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
             </VStack>
-            <ImageSelect label='Front Image' imageWidth={convert(config.size.width, config.units, 'px')} imageHeight={convert(config.size.height, config.units, 'px')} onChange={image => setConfig('image', 'front', image.toDataURL())}/>
-            <h2>Title & Font</h2>
-            <VStack alignItems='flex-start'>
-                <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
-                <HStack>
-                    <Select id='font-family' label='Font Family' width='14em' value={config.font.family} onChange={value => setConfig('font', 'family', value)}>
-                        <Select.Item value='Courier'>Courier</Select.Item>
-                        <Select.Item value='Helvetica'>Helvetica</Select.Item>
-                        <Select.Item value='Times-Roman'>Times Roman</Select.Item>
-                    </Select>
-                    <NumberInput id='font-size' label='Font Size' units='pt' value={config.font.size} onChange={value => setConfig('font', 'size', value)} />
-                    <NumberInput id='font-weight' label='Font Weight' value={config.font.weight} onChange={value => setConfig('font', 'weight', value)} />
-                </HStack>
-            </VStack>
+            <h2>Faces</h2>
+            <h3>Front</h3>
+            <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
+            <HStack>
+                <h3>Back</h3>
+                <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
+            </HStack>
+            <Show when={!config.face.back.sameAsFront}>
+                <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+            </Show>
             <h2>Download</h2>
             <VStack>
                 <Button.Group>

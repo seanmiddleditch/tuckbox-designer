@@ -5,6 +5,7 @@ import { createSignal, createEffect, onCleanup, Component } from 'solid-js'
 import Cropper from 'cropperjs'
 
 interface ImageSelectProps {
+    id: string,
     imageWidth: number,
     imageHeight: number,
     label: string,
