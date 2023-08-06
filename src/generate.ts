@@ -13,6 +13,8 @@ export interface GenerateOptions {
     face: {
         front: FaceOptions,
         back: FaceOptions,
+        top: FaceOptions,
+        bottom: FaceOptions,
     }
 }
 
@@ -216,10 +218,12 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             writeLine(options.face.back.text, options.face.back.font, back.x + back.width * 0.5, back.y + back.height * 0.25, back.width * 0.9)
 
         // top
-        writeLine(defaultText, defaultFont, back.x + back.width * 0.5, back.y - size.depth * 0.5, back.width * 0.9)
+        if (options.face.top.text && options.face.top.font)
+            writeLine(options.face.top.text, options.face.top.font, back.x + back.width * 0.5, back.y - size.depth * 0.5, back.width * 0.9)
 
         // bottom
-        writeCenterAngle(defaultText, defaultFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
+        if (options.face.bottom.text && options.face.bottom.font)
+            writeCenterAngle(options.face.bottom.text, options.face.bottom.font, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
 
         // side A
         writeCenterAngle(defaultText, defaultFont, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
@@ -313,8 +317,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         if (options.face.front.image)
             drawImage(front.x, front.y, front.width, front.height, options.face.front.image)
 
-            if (options.face.back.image)
+        if (options.face.back.image)
             drawImage(back.x, back.y, back.width, back.height, options.face.back.image)
+
+        if (options.face.top.image)
+            drawImage(front.x, front.y - size.depth, front.width, size.depth, options.face.top.image)
+
+        if (options.face.bottom.image)
+            drawImage(front.x, front.y + front.height, front.width, size.depth, options.face.bottom.image)
     }
     ctx.restore()
 

@@ -28,14 +28,18 @@ interface Config {
     color: string,
     face: {
         front: Face,
-        back: Face & { sameAsFront: boolean }
+        back: Face & { sameAsFront: boolean },
+        top: Face,
+        bottom: Face & { sameAsTop: boolean },
     },
     size: Size
 }
 
 interface FaceImageCache {
     front?: HTMLImageElement,
-    back?: HTMLImageElement
+    back?: HTMLImageElement,
+    top?: HTMLImageElement,
+    bottom?: HTMLImageElement,
 }
 
 const defaultFont: Font = {
@@ -57,6 +61,8 @@ const defualtConfig: Config = {
     face: {
         front: { ...defaultFace, text: 'Sample' },
         back: { sameAsFront: true, ...defaultFace },
+        top: defaultFace,
+        bottom: { sameAsTop: true, ...defaultFace },
     },
     size: {
         width: 2.25,
@@ -99,7 +105,7 @@ export const App = () => {
     }
     
     createEffect(() => {
-        const op = (face: Face, name: 'front' | 'back') => {
+        const op = (face: Face, name: 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right') => {
             if (face.image) {
                 const img = new Image()
                 img.onload = () => setImageCache({ [name]: img })
@@ -112,6 +118,8 @@ export const App = () => {
 
         op(config.face.front, 'front')
         op(config.face.back, 'back')
+        op(config.face.top, 'top')
+        op(config.face.bottom, 'bottom')
     })
 
     const drawToCanvas = (ctx: CanvasRenderingContext2D) => {
@@ -133,13 +141,25 @@ export const App = () => {
             text: config.face.back.text,
             image: imageCache.back
         }
+        const top = {
+            font: { ...config.face.top.font },
+            text: config.face.top.text,
+            image: imageCache.top
+        }
+        const bottom = config.face.bottom.sameAsTop ? top : {
+            font: { ...config.face.bottom.font },
+            text: config.face.bottom.text,
+            image: imageCache.bottom
+        }
 
         generate(ctx, {
             size,
             color: config.color,
             face: {
                 front,
-                back
+                back,
+                top,
+                bottom,
             }
         })
     }
@@ -243,12 +263,21 @@ export const App = () => {
             <h2>Faces</h2>
             <h3>Front</h3>
             <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
+            <h3>Top</h3>
+            <FaceComponent id='top-face' face={config.face.top} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'top')} />
             <HStack>
                 <h3>Back</h3>
                 <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
             </HStack>
             <Show when={!config.face.back.sameAsFront}>
                 <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+            </Show>
+            <HStack>
+                <h3>Bottom</h3>
+                <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
+            </HStack>
+            <Show when={!config.face.bottom.sameAsTop}>
+                <FaceComponent id='bottom-face' face={config.face.bottom} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
             </Show>
             <h2>Download</h2>
             <VStack>
