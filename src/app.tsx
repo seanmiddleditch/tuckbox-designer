@@ -31,6 +31,8 @@ interface Config {
         back: Face & { sameAsFront: boolean },
         top: Face,
         bottom: Face & { sameAsTop: boolean },
+        left: Face,
+        right: Face & { sameAsLeft: boolean },
     },
     size: Size
 }
@@ -40,6 +42,8 @@ interface FaceImageCache {
     back?: HTMLImageElement,
     top?: HTMLImageElement,
     bottom?: HTMLImageElement,
+    left?: HTMLImageElement,
+    right?: HTMLImageElement,
 }
 
 const defaultFont: Font = {
@@ -61,8 +65,10 @@ const defualtConfig: Config = {
     face: {
         front: { ...defaultFace, text: 'Sample' },
         back: { sameAsFront: true, ...defaultFace },
-        top: defaultFace,
+        top: { ...defaultFace },
         bottom: { sameAsTop: true, ...defaultFace },
+        left: { ...defaultFace },
+        right: { sameAsLeft: true, ...defaultFace },
     },
     size: {
         width: 2.25,
@@ -70,6 +76,8 @@ const defualtConfig: Config = {
         depth: 1.0
     },
 }
+
+type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
 
 const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units, setValue: (values: DeepPartial<Face>) => void }) => 
     <VStack alignItems='flex-start'>
@@ -89,6 +97,7 @@ const FaceComponent = (props: { id: string, face: Face, size: Size, units: Units
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [imageCache, setImageCache] = createStore<FaceImageCache>({})
+    const [currentFace, setCurrentFace] = createSignal<Faces>('front')
     const [preview, setPreview] = createSignal('canvas')
 
     let pageDetailsRef: HTMLDivElement|undefined = undefined
@@ -105,7 +114,7 @@ export const App = () => {
     }
     
     createEffect(() => {
-        const op = (face: Face, name: 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right') => {
+        const op = (face: Face, name: Faces) => {
             if (face.image) {
                 const img = new Image()
                 img.onload = () => setImageCache({ [name]: img })
@@ -120,6 +129,8 @@ export const App = () => {
         op(config.face.back, 'back')
         op(config.face.top, 'top')
         op(config.face.bottom, 'bottom')
+        op(config.face.left, 'left')
+        op(config.face.right, 'right')
     })
 
     const drawToCanvas = (ctx: CanvasRenderingContext2D) => {
@@ -129,27 +140,17 @@ export const App = () => {
             depth: convert(config.size.depth, config.units, 'pt')
         }
 
-        console.log({ ...config }, { ...config.face }, { ...config.face.back })
-
-        const front = {
-            font: { ...config.face.front.font },
-            text: config.face.front.text,
-            image: imageCache.front
-        }
+        const front = { ...config.face.front, image: imageCache.front }
         const back = config.face.back.sameAsFront ? front : {
-            font: { ...config.face.back.font },
-            text: config.face.back.text,
-            image: imageCache.back
+            ...config.face.back, image: imageCache.back
         }
-        const top = {
-            font: { ...config.face.top.font },
-            text: config.face.top.text,
-            image: imageCache.top
-        }
+        const top = { ...config.face.top, image: imageCache.top }
         const bottom = config.face.bottom.sameAsTop ? top : {
-            font: { ...config.face.bottom.font },
-            text: config.face.bottom.text,
-            image: imageCache.bottom
+            ...config.face.bottom, image: imageCache.bottom
+        }
+        const left = { ...config.face.left, image: imageCache.left }
+        const right = config.face.right.sameAsLeft ? left : {
+            ...config.face.right, image: imageCache.right
         }
 
         generate(ctx, {
@@ -160,6 +161,8 @@ export const App = () => {
                 back,
                 top,
                 bottom,
+                left,
+                right,
             }
         })
     }
@@ -260,25 +263,46 @@ export const App = () => {
                 <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
                 <ColorPicker label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
             </VStack>
-            <h2>Faces</h2>
-            <h3>Front</h3>
-            <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
-            <h3>Top</h3>
-            <FaceComponent id='top-face' face={config.face.top} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'top')} />
-            <HStack>
-                <h3>Back</h3>
-                <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
+            <HStack alignItems='baseline'>
+                <h2>Faces</h2>
+                <Toggle.Group value={currentFace()} onChange={setCurrentFace} style={{ height: '2.5em', 'vertical-align': 'end' }}>
+                    <Toggle.Button value='front'>Front</Toggle.Button>
+                    <Toggle.Button value='back'>Back</Toggle.Button>
+                    <Toggle.Button value='top'>Top</Toggle.Button>
+                    <Toggle.Button value='bottom'>Bottom</Toggle.Button>
+                    <Toggle.Button value='left'>Left</Toggle.Button>
+                    <Toggle.Button value='right'>Right</Toggle.Button>
+                </Toggle.Group>
             </HStack>
-            <Show when={!config.face.back.sameAsFront}>
-                <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
-            </Show>
-            <HStack>
-                <h3>Bottom</h3>
-                <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
-            </HStack>
-            <Show when={!config.face.bottom.sameAsTop}>
-                <FaceComponent id='bottom-face' face={config.face.bottom} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
-            </Show>
+            <Switch>
+                <Match when={currentFace() == 'front'}>
+                    <FaceComponent id='front-face' face={config.face.front} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'front')} />
+                </Match>
+                <Match when={currentFace() == 'back'}>
+                    <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
+                    <Show when={!config.face.back.sameAsFront}>
+                        <FaceComponent id='back-face' face={config.face.back} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+                    </Show>
+                </Match>
+                <Match when={currentFace() == 'top'}>
+                    <FaceComponent id='top-face' face={config.face.top} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'top')} />
+                </Match>
+                <Match when={currentFace() == 'bottom'}>
+                    <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
+                    <Show when={!config.face.bottom.sameAsTop}>
+                        <FaceComponent id='bottom-face' face={config.face.bottom} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
+                    </Show>
+                </Match>
+                <Match when={currentFace() == 'left'}>
+                    <FaceComponent id='left-face' face={config.face.left} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'left')} />
+                </Match>
+                <Match when={currentFace() == 'right'}>
+                    <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
+                    <Show when={!config.face.right.sameAsLeft}>
+                        <FaceComponent id='right-face' face={config.face.right} size={config.size} units={config.units} setValue={setConfig.bind(undefined, 'face', 'right')}/>
+                    </Show>
+                </Match>
+            </Switch>
             <h2>Download</h2>
             <VStack>
                 <Button.Group>

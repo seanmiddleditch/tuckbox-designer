@@ -7,7 +7,7 @@ export function createLocalStore<T extends Object>(name: string, init: T): [T, S
     const localStateString = localStorage.getItem(name)
 
     const localState: DeepPartial<T> = localStateString ? JSON.parse(localStateString) : {}
-    const initialState = structuredClone(init)
+    const initialState: T = JSON.parse(JSON.stringify(init))
     deepmergeInto(initialState, localState)
 
     const [store, setStore] = createStore<T>(initialState)

@@ -15,6 +15,8 @@ export interface GenerateOptions {
         back: FaceOptions,
         top: FaceOptions,
         bottom: FaceOptions,
+        left: FaceOptions,
+        right: FaceOptions,
     }
 }
 
@@ -54,7 +56,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.arc(back.x + size.width - size.width * 0.2, back.y - size.depth, size.width * 0.2, Math.PI * 1.5, Math.PI * 2)
         ctx.lineTo(back.x + size.width, back.y - size.depth * 0.6)
 
-        // side B (top)
+        // left (top)
         ctx.arc(back.x + back.width + size.depth * 0.5, back.y - size.depth * 0.1, size.depth * 0.5, Math.PI * 1.5, Math.PI * 2)
         ctx.lineTo(front.x, front.y)
     
@@ -63,7 +65,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.arc(front.x + front.width * 0.5, front.y, front.width * 0.15, Math.PI, 0, true)
         ctx.lineTo(front.x + front.width, front.y)
     
-        // inner side
+        // inner right
         ctx.lineTo(front.x + front.width + size.depth * 0.8, front.y)
         ctx.lineTo(front.x + front.width + size.depth * 0.8, front.y + size.height)
         ctx.lineTo(front.x + front.width, front.y + size.height)
@@ -72,7 +74,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.8)
         ctx.lineTo(front.x, front.y + front.height + size.depth * 0.8)
 
-        // side B (bottom)
+        // left (bottom)
         ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
         ctx.lineTo(back.x + back.width, back.y + size.height + size.depth * 0.6)
 
@@ -81,7 +83,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.lineTo(back.x, back.y + back.height + size.depth)
         ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
         
-        // side A
+        // right
         ctx.lineTo(back.x - size.depth, back.y + back.height + size.depth * 0.6)
         ctx.lineTo(back.x - size.depth, back.y)
         ctx.arc(back.x - size.depth * 0.5, back.y - size.depth * 0.1, size.depth * 0.5, Math.PI, Math.PI * 1.5)
@@ -116,13 +118,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.moveTo(back.x, back.y + back.height)
         ctx.lineTo(back.x + back.width, back.y + back.height)
     
-        // side A
+        // right
         ctx.moveTo(back.x - size.depth, back.y)
         ctx.lineTo(back.x, back.y)
         ctx.lineTo(back.x, back.y + size.height)
         ctx.lineTo(back.x - size.depth, back.y + size.height)
     
-        // side B
+        // left
         ctx.moveTo(back.x + back.width, back.y)
         ctx.lineTo(back.x + back.width + size.depth, back.y)
         ctx.lineTo(back.x + back.width + size.depth, back.y + size.height)
@@ -225,11 +227,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         if (options.face.bottom.text && options.face.bottom.font)
             writeCenterAngle(options.face.bottom.text, options.face.bottom.font, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.5, Math.PI, front.width * 0.9)
 
-        // side A
-        writeCenterAngle(defaultText, defaultFont, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
+        // left
+        if (options.face.left.text && options.face.left.font)
+            writeCenterAngle(options.face.left.text, options.face.left.font, back.x - size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 1.5, back.height * 0.9)
 
-        // side B
-        writeCenterAngle(defaultText, defaultFont, back.x + back.width + size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 0.5, back.height * 0.9)
+        // right
+        if (options.face.right.text && options.face.right.font)
+            writeCenterAngle(options.face.right.text, options.face.right.font, back.x + back.width + size.depth * 0.5, back.y + back.height * 0.5, Math.PI * 0.5, back.height * 0.9)
     }
 
     const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement) => {
@@ -325,6 +329,12 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         if (options.face.bottom.image)
             drawImage(front.x, front.y + front.height, front.width, size.depth, options.face.bottom.image)
+
+        if (options.face.left.image)
+            drawImage(front.x - size.depth, front.y, size.depth, front.height, options.face.left.image)
+
+        if (options.face.right.image)
+            drawImage(back.x - size.depth, back.y, size.depth, back.height, options.face.right.image)
     }
     ctx.restore()
 
