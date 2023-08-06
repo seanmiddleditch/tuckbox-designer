@@ -67,7 +67,7 @@ const defualtConfig: Config = {
     units: 'in',
     page: 'letter',
     title: 'Sample',
-    color: { r: 1, g: 1, b: 1 },
+    color: { r: 255, g: 255, b: 255 },
     view: {
         preview: 'canvas',
         face: 'front',
