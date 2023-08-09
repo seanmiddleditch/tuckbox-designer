@@ -81,6 +81,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         if (font.outlineWidth > 0) {
             ctx.strokeStyle = `rgb(${font.outlineColor.r}, ${font.outlineColor.g}, ${font.outlineColor.b})`
             ctx.lineWidth = font.outlineWidth
+            console.log(font.outlineWidth)
         }
         else {
             ctx.strokeStyle = `rgba(1, 1, 1, 0)`

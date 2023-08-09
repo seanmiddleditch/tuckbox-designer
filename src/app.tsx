@@ -106,18 +106,18 @@ const FaceComponent = (props: FaceComponentProps) =>
     <VStack alignItems='flex-start'>
         <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => props.setValue({ text })} />
         <HStack>
-            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
+            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
                 <Select.Item value='Courier'>Courier</Select.Item>
                 <Select.Item value='Helvetica'>Helvetica</Select.Item>
                 <Select.Item value='Times-Roman'>Times Roman</Select.Item>
             </Select>
-            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
-            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
+            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
+            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
         </HStack>
         <HStack>
-            <ColorPicker id={`${props.id}-font-color`} label='Font Color' color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
-            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
-            <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
+            <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
+            <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
+            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
         </HStack>
         <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensions(props.id, props.options)} onChange={image => props.setValue({ image: image.toDataURL() })}/>
     </VStack>
