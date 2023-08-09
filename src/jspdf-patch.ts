@@ -2,34 +2,37 @@ import { Context2d, Matrix, Rectangle } from 'jspdf'
 
 export default function(ctx: Context2d): CanvasRenderingContext2D {
     const fillText = ctx.fillText.bind(ctx)
+    const strokeText = ctx.strokeText.bind(ctx)
     const drawImage = ctx.drawImage.bind(ctx)
 
     // https://github.com/parallax/jsPDF/issues/2733
     // https://github.com/parallax/jsPDF/issues/3225
-    ctx.fillText = function (text, x, y, w) {
+    const text = (func: (t: string, x: number, y: number, w?: number) => void, text: string, x: number, y: number, w?: number) => {
         // scalars to correct jsPDF failing to convert from canvas pixel units to pdf points
         const scale = 96.0 / 72.0
         const invScale = 1.0 / scale
         
         // x-asis adjustment scalar to apply for text alignment because jsPDF only applies
         // alignment after transforming the text bounding box
-        const align = this.textAlign
+        const align = ctx.textAlign
         const xs = (align == 'center' ? 0.5 :
             align == 'right' || align == 'end' ? 1.0 : 0.0)
 
         // save state so subsequent drawing operations aren't affected
-        this.save()
+        ctx.save()
         try {
-            this.scale(scale, 1)
-            this.textAlign = 'left'
+            ctx.scale(scale, 1)
+            ctx.textAlign = 'left'
 
-            const m: any = this.measureText(text)
-            fillText(text, (x - m.width * xs) * invScale, y, w !== undefined ? w * invScale : undefined)
+            const m: any = ctx.measureText(text)
+            func(text, (x - m.width * xs) * invScale, y, w !== undefined ? w * invScale : undefined)
         }
         finally {
-            this.restore()
+            ctx.restore()
         }
     }
+    ctx.fillText = text.bind(null, fillText)
+    ctx.strokeText = text.bind(null, strokeText)
 
     ctx.drawImage = function (img, x, y, w, h) {
         const self = this as any
