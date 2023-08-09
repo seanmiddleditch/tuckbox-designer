@@ -1,5 +1,5 @@
-import { createEffect, createSignal, Switch, Match, Show } from 'solid-js'
-import { SetStoreFunction, createStore } from 'solid-js/store'
+import { createEffect, Switch, Match, Show, onCleanup } from 'solid-js'
+import { SetStoreFunction, StoreSetter, createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
 import { generate } from './generate'
@@ -14,7 +14,6 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
 import { Download as DownloadIcon } from '@suid/icons-material'
-import { DeepPartial } from 'ts-essentials'
 import { Font, Size, Face, RGB } from './types'
 import patchJsPdf from './jspdf-patch'
 
@@ -39,8 +38,11 @@ interface Config {
         bottom: Face & { sameAsTop: boolean }
         left: Face
         right: Face & { sameAsLeft: boolean }
-    },
+    }
     size: Size
+    bleed: number
+    margin: number
+    thickness: number
 }
 
 interface FaceImageCache {
@@ -85,6 +87,9 @@ const defualtConfig: Config = {
         height: 3.5,
         depth: 1.0
     },
+    bleed: 0.12,
+    margin: 0.25,
+    thickness: 0.02
 }
 
 interface FaceComponentProps {
@@ -92,20 +97,20 @@ interface FaceComponentProps {
     face: Face
     width: number
     height: number
-    setValue: (values: DeepPartial<Face>) => void
+    setValue: (...params: any[]) => void
 }
 
 const FaceComponent = (props: FaceComponentProps) => 
     <VStack alignItems='flex-start'>
-        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.face.text} onChange={value => props.setValue({ text: value })} />
+        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.face.text} onChange={text => props.setValue({ text })} />
         <HStack>
-            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.face.font.family} onChange={value => props.setValue({ font: { family: value } })}>
+            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.face.font.family} onChange={family => props.setValue('font', { family })}>
                 <Select.Item value='Courier'>Courier</Select.Item>
                 <Select.Item value='Helvetica'>Helvetica</Select.Item>
                 <Select.Item value='Times-Roman'>Times Roman</Select.Item>
             </Select>
-            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' value={props.face.font.size} onChange={value => props.setValue({ font: { size: value } })} />
-            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={value => props.setValue({ font: { weight: value } })} />
+            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer value={props.face.font.size} onChange={size => props.setValue('font', { size })} />
+            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={weight => props.setValue('font', { weight })} />
         </HStack>
         <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={props.width} imageHeight={props.height} onChange={image => props.setValue({ image: image.toDataURL() })}/>
     </VStack>
@@ -113,20 +118,27 @@ const FaceComponent = (props: FaceComponentProps) =>
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [imageCache, setImageCache] = createStore<FaceImageCache>({})
-
+    
+    let pdfDataUrl = ''
+    let pdfBlob: Blob|undefined = undefined
     let pageDetailsRef: HTMLDivElement|undefined = undefined
     let canvasRef: HTMLCanvasElement|undefined = undefined
     let pdfLinkRef: HTMLAnchorElement|undefined = undefined
-    let data_url: string = ''
     let previewFrameRef: HTMLIFrameElement|undefined = undefined
 
-    const resetConfig = () => {
-        if (confirm('Reset all configuration?')) {
-            localStorage.clear()
-            setConfig(defualtConfig)
+    const toPt = (value: number) => convert(value, config.units, 'pt')
+    const toPx = (value: number) => convert(value, config.units, 'px')
+
+    // Release the cached PDF data url (not important in a top-level app
+    // content, but good practice anyway)
+    onCleanup(() => {
+        if (pdfDataUrl !== '') {
+            URL.revokeObjectURL(pdfDataUrl)
+            pdfDataUrl = ''
         }
-    }
+    })
     
+    // Update the Image caches for each face based on the stored data URL
     createEffect(() => {
         const op = (face: Face, name: Faces) => {
             if (face.image) {
@@ -147,11 +159,29 @@ export const App = () => {
         op(config.face.right, 'right')
     })
 
-    const drawToCanvas = (ctx: CanvasRenderingContext2D) => {
+    const changeUnits = (units: Units) => {
+        setConfig((store) => {
+            const precision = units == 'mm' ? 1 : units == 'pt' ? 4 : 2
+            const cv = (value: number) => Number.parseFloat(convert(value, store.units, units).toFixed(precision))
+            return {
+                size: {
+                    width: cv(store.size.width),
+                    height: cv(store.size.height),
+                    depth: cv(store.size.depth),
+                },
+                bleed: cv(store.bleed),
+                margin: cv(store.margin),
+                thickness: cv(store.thickness),
+                units
+            }
+        })
+    }
+
+    const renderTuckBox = (ctx: CanvasRenderingContext2D) => {
         const size = {
-            width: convert(config.size.width, config.units, 'pt'),
-            height: convert(config.size.height, config.units, 'pt'),
-            depth: convert(config.size.depth, config.units, 'pt')
+            width: toPt(config.size.width),
+            height: toPt(config.size.height),
+            depth: toPt(config.size.depth)
         }
 
         const front = { ...config.face.front, image: imageCache.front }
@@ -170,6 +200,9 @@ export const App = () => {
         generate(ctx, {
             size,
             color: config.color,
+            bleed: toPt(config.bleed),
+            thickness: toPt(config.thickness),
+            margin: toPt(config.margin),
             face: {
                 front,
                 back,
@@ -180,7 +213,7 @@ export const App = () => {
             }
         })
     }
-    
+        
     const generatePdfBlob = () => {
         const doc = new PDFDocument({
             orientation: 'landscape',
@@ -190,23 +223,18 @@ export const App = () => {
 
         const ctx = patchJsPdf(doc.canvas.getContext("2d"))
         
-        drawToCanvas(ctx)
+        renderTuckBox(ctx)
 
         const bytes = doc.output('blob')
-        const blob = new Blob([bytes], { type: 'application/pdf' })
-        return blob
+        pdfBlob = new Blob([bytes], { type: 'application/pdf' })
+
+        URL.revokeObjectURL(pdfDataUrl)
+        pdfDataUrl = URL.createObjectURL(pdfBlob)
+
+        return { blob: pdfBlob, url: pdfDataUrl }
     }
-
-    const makeDataUrl = (blob: Blob) => {
-        if (data_url) {
-            URL.revokeObjectURL(data_url)
-            data_url = ''
-        }
-
-        data_url = URL.createObjectURL(blob)
-        return data_url
-    }
-
+        
+    // Update previews
     createEffect(() => {
         if (config.view.preview == 'canvas') {
             // page dimensions
@@ -221,33 +249,39 @@ export const App = () => {
             const ctx = canvas.getContext("2d")!
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-            drawToCanvas(ctx)
+            renderTuckBox(ctx)
         }
         else if (config.view.preview == 'pdf') {
-            const blob = generatePdfBlob()
-            const url = makeDataUrl(blob)
-    
+            const { blob, url } = generatePdfBlob()
             previewFrameRef!.src = url
         }
     })
+    
+    const resetConfig = () => {
+        if (confirm('Reset all configuration?')) {
+            localStorage.clear()
+            setConfig(defualtConfig)
+        }
+    }
 
     const savePdf = () => {
-        const blob = generatePdfBlob()
-        const url = makeDataUrl(blob)
+        const { blob, url } = generatePdfBlob()
+
+        let name = config.title.toLowerCase().replace(/[^a-z0-9]+/, '-')
+        if (name === '')
+            name += '-'
+        name += 'tuckbox.pdf'
 
         pdfLinkRef!.href = url
-        pdfLinkRef!.download = 'tuckbox.pdf'
+        pdfLinkRef!.download = name
         pdfLinkRef!.click()
     }
 
     const openPdf = () => {
-        const blob = generatePdfBlob()
-        const url = makeDataUrl(blob)
+        const { blob, url } = generatePdfBlob()
 
         window.open(url, 'pdf')
     }
-
-    const toPx = (value: number) => convert(value, config.units, 'px')
 
     return <HStack spacing={8} width='100%' height='100%'>
         <VStack>
@@ -257,12 +291,17 @@ export const App = () => {
                     <Select.Item value='letter'>US Letter</Select.Item>
                     <Select.Item value='a4'>A4</Select.Item>
                 </Select>
-                <Select id='page-size' label='Units' value={config.units} onChange={value => setConfig('units', value as Units)}>
+                <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
                     <Select.Item value='cm'>centimeters</Select.Item>
                     <Select.Item value='mm'>millimeters</Select.Item>
                     <Select.Item value='in'>inches</Select.Item>
                     <Select.Item value='pt'>points</Select.Item>
                 </Select>
+            </HStack>
+            <HStack>
+                <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
+                <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
             </HStack>
             <h2>Deck Setup</h2>
             <VStack alignItems='flex-start'>

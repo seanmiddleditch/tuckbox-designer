@@ -1,4 +1,4 @@
-import { mm2pt, convert } from './convert'
+import { mm2pt, convert, in2pt } from './convert'
 import { Size, Font, RGB } from './types'
 
 export interface FaceOptions {
@@ -8,15 +8,18 @@ export interface FaceOptions {
 }
 
 export interface GenerateOptions {
-    size: Size,
-    color: RGB,
+    size: Size
+    color: RGB
+    bleed: number
+    thickness: number
+    margin: number
     face: {
-        front: FaceOptions,
-        back: FaceOptions,
-        top: FaceOptions,
-        bottom: FaceOptions,
-        left: FaceOptions,
-        right: FaceOptions,
+        front: FaceOptions
+        back: FaceOptions
+        top: FaceOptions
+        bottom: FaceOptions
+        left: FaceOptions
+        right: FaceOptions
     }
 }
 
@@ -29,17 +32,16 @@ const defaultFont: Font = {
 
 export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
     // expand size to account for paper thickness
-    const thickness = mm2pt(0.4)
-    const bleed = mm2pt(3)
+    const margin = in2pt(.25)
     const size = {
-        width: options.size.width + thickness,
-        height: options.size.height + thickness,
-        depth: options.size.depth + thickness
+        width: options.size.width + options.thickness * 2,
+        height: options.size.height + options.thickness * 2,
+        depth: options.size.depth + options.thickness * 2
     }
 
-    const offset = size.depth + Math.max(size.depth, size.width * 0.3)
-    const front = { x: offset, y: offset, width: size.width, height: size.height }
-    const back = { x: front.x + front.width + size.depth, y: front.y, width: size.width, height: size.height }
+    const offset = { x: size.depth + margin, y: size.depth + size.width * 0.2 + margin }
+    const front = { x: offset.x, y: offset.y, width: size.width, height: size.height }
+    const back = { x: front.x + front.width + size.depth, y: front.y, width: front.width, height: front.height }
 
     const lineWidth = 1
     const foldDash = [0.1 * 72.0, 0.05 * 72.0] // quarter inch and tenth of inch, at 72 DPI
@@ -52,9 +54,9 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // top
         ctx.moveTo(front.x, front.y - size.depth * 0.6)
         ctx.lineTo(front.x, front.y - size.depth)
-        ctx.arc(front.x + size.width * 0.2, front.y - size.depth, size.width * 0.2, Math.PI, Math.PI * 1.5)
-        ctx.arc(front.x + size.width - size.width * 0.2, front.y - size.depth, size.width * 0.2, Math.PI * 1.5, Math.PI * 2)
-        ctx.lineTo(front.x + size.width, front.y - size.depth * 0.6)
+        ctx.arc(front.x + front.width * 0.2, front.y - size.depth, front.width * 0.2, Math.PI, Math.PI * 1.5)
+        ctx.arc(front.x + front.width - front.width * 0.2, front.y - size.depth, front.width * 0.2, Math.PI * 1.5, Math.PI * 2)
+        ctx.lineTo(front.x + front.width, front.y - size.depth * 0.6)
 
         // left (top)
         ctx.arc(front.x + front.width + size.depth * 0.5, front.y - size.depth * 0.1, size.depth * 0.5, Math.PI * 1.5, Math.PI * 2)
@@ -67,8 +69,8 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     
         // inner right
         ctx.lineTo(back.x + back.width + size.depth * 0.8, back.y)
-        ctx.lineTo(back.x + back.width + size.depth * 0.8, back.y + size.height)
-        ctx.lineTo(back.x + back.width, back.y + size.height)
+        ctx.lineTo(back.x + back.width + size.depth * 0.8, back.y + back.height)
+        ctx.lineTo(back.x + back.width, back.y + back.height)
 
         // back (bottom)
         ctx.lineTo(back.x + back.width, back.y + back.height + size.depth * 0.8)
@@ -76,7 +78,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         // left (bottom)
         ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
-        ctx.lineTo(front.x + front.width, front.y + size.height + size.depth * 0.6)
+        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
         // inner bottom
         ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
@@ -121,14 +123,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // right
         ctx.moveTo(front.x - size.depth, front.y)
         ctx.lineTo(front.x, front.y)
-        ctx.lineTo(front.x, front.y + size.height)
-        ctx.lineTo(front.x - size.depth, front.y + size.height)
+        ctx.lineTo(front.x, front.y + front.height)
+        ctx.lineTo(front.x - size.depth, front.y + front.height)
     
         // left
         ctx.moveTo(front.x + front.width, front.y)
         ctx.lineTo(front.x + front.width + size.depth, front.y)
-        ctx.lineTo(front.x + front.width + size.depth, front.y + size.height)
-        ctx.lineTo(front.x + front.width, front.y + size.height)
+        ctx.lineTo(front.x + front.width + size.depth, front.y + front.height)
+        ctx.lineTo(front.x + front.width, front.y + front.height)
         ctx.lineTo(front.x + front.width, front.y)
     
         // back
@@ -138,9 +140,9 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     
         // top
         ctx.moveTo(front.x, front.y)
-        ctx.lineTo(front.x + size.width, front.y)
-        ctx.moveTo(front.x + size.width * 0.1, front.y - size.depth)
-        ctx.lineTo(front.x + size.width * 0.9, front.y - size.depth)
+        ctx.lineTo(front.x + front.width, front.y)
+        ctx.moveTo(front.x + front.width * 0.1, front.y - size.depth)
+        ctx.lineTo(front.x + front.width * 0.9, front.y - size.depth)
     }
 
     const wrapText = (text: string, w: number, lineHeight: number, cb: (t: string, y: number) => void) => {
@@ -246,16 +248,16 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.restore()
     }
 
-    // frontground color (overlap to handle bleed)
+    // box color (overlap to handle bleed)
     ctx.save()
-    {
+    if (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1) {
         ctx.setLineDash([])
         ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
 
-        ctx.fillRect(front.x - size.depth - bleed,
-            front.y - size.depth * 1.5 - bleed,
-            front.width + back.width + options.size.depth * 2.9 + bleed * 2,
-            front.height + size.depth * 2.5 + bleed * 2)
+        ctx.fillRect(front.x - size.depth - options.bleed,
+            front.y - size.depth * 1.5 - options.bleed,
+            front.width + back.width + size.depth * 2.9 + options.bleed * 2,
+            front.height + size.depth * 2.5 + options.bleed * 2)
 
         ctx.fill()
     }
@@ -300,7 +302,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         ctx.setLineDash(foldDash)
         ctx.lineWidth = lineWidth
-        ctx.strokeStyle = '#000000'
+        ctx.strokeStyle = '#666666'
 
         ctx.stroke()
     }
@@ -340,4 +342,10 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         drawText()
     }
     ctx.restore()
+
+    // ctx.strokeStyle = '#ff0000'
+    // ctx.strokeRect(front.x + options.bleed, front.y + options.bleed, front.width - options.bleed * 2, front.height - options.bleed * 2)
+
+    // ctx.strokeStyle = '#00ff00'
+    // ctx.strokeRect(front.x + options.thickness, front.y + options.thickness, options.size.width, options.size.height)
 }

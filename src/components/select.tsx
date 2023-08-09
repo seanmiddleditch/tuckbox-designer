@@ -6,22 +6,20 @@ interface SelectItemProps {
     children: JSX.Element
 }
 
-interface SelectProps {
+interface SelectProps<T> {
     id: string,
     label: string,
-    value: string,
+    value: T,
     width?: string,
-    onChange: (value: string) => void,
+    onChange: (value: T) => void,
     children: JSX.ArrayElement
 }
 
-type Select = Component<SelectProps> & { Item: Component<SelectItemProps> }
-
-export const Select: Select = props => (<FormControl sx={{ width: props.width }}>
+export const Select = <T,>(props: SelectProps<T>) => (<FormControl sx={{ width: props.width }}>
     <InputLabel for={props.id}>{props.label}</InputLabel>
     <SuidSelect id={props.id} size='small' label={props.label} value={props.value} onChange={e => props.onChange(e.target.value)}>
         {props.children}
     </SuidSelect>
 </FormControl>)
 
-Select.Item = props => <MenuItem value={props.value}>{props.children}</MenuItem>
+Select.Item = (props: SelectItemProps) => <MenuItem value={props.value}>{props.children}</MenuItem>
