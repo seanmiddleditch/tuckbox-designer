@@ -27,7 +27,10 @@ const defaultText = 'Sample'
 const defaultFont: Font = {
     family: 'Times-Roman',
     size: 14,
-    weight: 700
+    weight: 700,
+    color: { r: 0, g: 0, b: 0 },
+    outlineColor: { r: 255, g: 255, b: 255 },
+    outlineWidth: 0
 }
 
 export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
@@ -48,6 +51,15 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
     const setFont = (font: Font) => {
         ctx.font = `${Math.round(font.weight)} ${Math.round(font.size)}pt ${font.family}`
+        ctx.fillStyle = `rgb(${font.color.r}, ${font.color.g}, ${font.color.b})`
+        if (font.outlineWidth > 0) {
+            ctx.strokeStyle = `rgb(${font.outlineColor.r}, ${font.outlineColor.g}, ${font.outlineColor.b})`
+            ctx.lineWidth = font.outlineWidth
+        }
+        else {
+            ctx.strokeStyle = `rgba(1, 1, 1, 0)`
+            ctx.lineWidth = 1
+        }
     }
 
     const pathOutline = () => {
@@ -150,7 +162,6 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         var line = ''
         var first = true
         var yOffset = 0
-        var lastWidth = 0
 
         for (const word of words) {
             const attempt = line + word + ' '
@@ -173,10 +184,23 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             cb(line, yOffset)
     }
 
+    const findLineHeight = () => {
+        const m = ctx.measureText('M')
+        if ('fontBoundingBoxAscent' in (m as object) && 'fontBoundingBoxDescent' in (m as object))
+            return m.fontBoundingBoxAscent + m.fontBoundingBoxDescent
+        else
+            return m.width // hack
+    }
+
+    const drawLine = (x: number, y: number, text: string) => {
+        ctx.strokeText(text, x, y)
+        ctx.fillText(text, x, y)
+    }
+
     const writeLine = (text: string, font: Font, x: number, y: number, w: number) => {
         ctx.save()
         setFont(font)
-        wrapText(text, w, 20, (line, yOffset) => ctx.fillText(line, x, y + yOffset, w))
+        wrapText(text, w, findLineHeight(), (line, yOffset) => drawLine(x, y + yOffset, line))
         ctx.restore()
     }
 
@@ -200,13 +224,12 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         const cb = (line: string, yOffset: number) => {
             const m: any = ctx.measureText(line)
-            ctx.fillText(line, -m.width * xs, yOffset)
+            drawLine(-m.width * xs, yOffset, line)
         }
 
         const m = ctx.measureText(text)
         ctx.textAlign = 'left'
-        wrapText(text, w, 20, cb)
-        //ctx.fillText(text, -Math.min(m.width, w) * xs, 0, w)
+        wrapText(text, w, findLineHeight(), cb)
         ctx.textAlign = textAlign
 
         ctx.restore()

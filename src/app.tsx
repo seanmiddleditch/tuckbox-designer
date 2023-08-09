@@ -58,6 +58,9 @@ const defaultFont: Font = {
     family: 'Times-Roman',
     size: 18,
     weight: 700,
+    color: { r: 0, g: 0, b: 0 },
+    outlineColor: { r: 255, g: 255, b: 255 },
+    outlineWidth: 0,
 }
 
 const defaultFace: Face = {
@@ -111,6 +114,11 @@ const FaceComponent = (props: FaceComponentProps) =>
             </Select>
             <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer value={props.face.font.size} onChange={size => props.setValue('font', { size })} />
             <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={weight => props.setValue('font', { weight })} />
+        </HStack>
+        <HStack>
+            <ColorPicker id={`${props.id}-font-color`} label='Font Color' color={props.face.font.color} onChange={color => props.setValue('font', { color })} />
+            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' color={props.face.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
+            <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' value={props.face.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
         </HStack>
         <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={props.width} imageHeight={props.height} onChange={image => props.setValue({ image: image.toDataURL() })}/>
     </VStack>

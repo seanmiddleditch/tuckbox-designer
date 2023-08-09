@@ -10,6 +10,9 @@ export interface Font {
     family: string
     size: number
     weight: number
+    color: RGB
+    outlineColor: RGB
+    outlineWidth: number
 }
 
 export interface Size {
