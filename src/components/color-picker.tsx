@@ -6,12 +6,13 @@ import { RGB } from '../types'
 
 interface ColorButtonsProps {
     color: RGB,
+    disabled?: boolean
     onClick: (e: any) => void
 }
 
 const colorToString = (rgb: RGB) => `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
 
-const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} style={{ padding: 0, 'min-width': 0 }}>
+const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} disabled={props.disabled} style={{ padding: 0, 'min-width': 0 }}>
     <div style={{
         'width': '1.5em',
         'height': '1.5em',
@@ -48,12 +49,18 @@ interface ColorPickerProps {
 export const ColorPicker: Component<ColorPickerProps> = props => {
     const [isColorOpen, setColorOpen] = createSignal(false)
 
-    const button = () => <InputAdornment position='end'><ColorButton color={props.color} onClick={() => props.disabled && setColorOpen(true)} /></InputAdornment>
+    const button = () => <InputAdornment position='end'><ColorButton color={props.color} disabled={props.disabled} onClick={() => setColorOpen(true)} /></InputAdornment>
+
+    const onClick = (e: MouseEvent) => {
+        const input = e.target as HTMLInputElement
+        if (input.selectionStart == input.selectionEnd)
+            setColorOpen(true)
+    }
 
     return <>
         <FormControl size='small' variant='outlined'>
             <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
-            <OutlinedInput id={props.id} disabled label={props.label} value={colorToString(props.color)} endAdornment={button()} />
+            <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={colorToString(props.color)} endAdornment={button()} />
         </FormControl>
         <Modal open={isColorOpen()} onClose={() => setColorOpen(false)}>
             <Box sx={{
