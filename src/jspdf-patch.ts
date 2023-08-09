@@ -1,9 +1,12 @@
-import { Context2d, Matrix, Rectangle } from 'jspdf'
+import { Context2d, Matrix, jsPDF } from 'jspdf'
 
 export default function(ctx: Context2d): CanvasRenderingContext2D {
     const fillText = ctx.fillText.bind(ctx)
     const strokeText = ctx.strokeText.bind(ctx)
     const drawImage = ctx.drawImage.bind(ctx)
+    const clip = ctx.clip.bind(ctx)
+    const pdfClip = (ctx as any).pdf.clip
+    const pdfDiscardPath = (ctx as any).pdf.discardPath
 
     // https://github.com/parallax/jsPDF/issues/2733
     // https://github.com/parallax/jsPDF/issues/3225
@@ -34,6 +37,7 @@ export default function(ctx: Context2d): CanvasRenderingContext2D {
     ctx.fillText = text.bind(null, fillText)
     ctx.strokeText = text.bind(null, strokeText)
 
+    // https://github.com/parallax/jsPDF/issues/3624
     ctx.drawImage = function (img, x, y, w, h) {
         const self = this as any
 
@@ -56,6 +60,34 @@ export default function(ctx: Context2d): CanvasRenderingContext2D {
             -deg
           );
     }
+
+    // https://github.com/parallax/jsPDF/issues/3408
+    const patchClip = function (this: Context2d): jsPDF {
+        const self = this as any
+
+        // clip is recursive for some cases; disable recursion into ourselves
+        ctx.clip = clip
+
+        // disable the problem calls into the pdf backend
+        self.pdf.clip = () => {}
+        self.pdf.discardPath = () => {}
+
+        // perform real clipping
+        clip()
+
+        // restore problem calls into the pdf backend
+        self.pdf.clip = pdfClip
+        self.pdf.discardPath = pdfDiscardPath
+
+        // finalize the real clipping operation (was disabled)
+        self.pdf.clip()
+        self.pdf.discardPath()
+
+        // restore patched clip
+        ctx.clip = patchClip
+        return self.pdf
+    }
+    ctx.clip = patchClip
 
     return (ctx as unknown) as CanvasRenderingContext2D
 }
