@@ -9,11 +9,10 @@ import { createStore } from 'solid-js/store'
 import { Rotate90DegreesCwRounded, Rotate90DegreesCcwRounded, SwapHorizRounded, SwapVertRounded } from '@suid/icons-material'
 
 interface ImageSelectProps {
-    id: string,
-    imageWidth: number,
-    imageHeight: number,
-    label: string,
-    accept?: string,
+    id: string
+    dimensions: [number, number]
+    label: string
+    accept?: string
     onChange: (value: HTMLCanvasElement) => void
 }
 
@@ -35,8 +34,7 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
 
     var fileRef: HTMLInputElement | undefined = undefined
     
-    const aspectRatio = (props.imageWidth !== undefined && props.imageHeight !== undefined) ?
-        (props.imageWidth / props.imageHeight ): (4 / 3)
+    const aspectRatio = props.dimensions[1] != 0 ? props.dimensions[0] / props.dimensions[1] : 4 / 3
 
     onCleanup(() => {
         if (store.cropper)
@@ -92,8 +90,8 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
             return
 
         const image = cropper.getCroppedCanvas({
-            maxWidth: props.imageWidth || 400,
-            maxHeight: props.imageHeight || 300,
+            maxWidth: props.dimensions[0] || 400,
+            maxHeight: props.dimensions[1] || 300,
         })
         props.onChange(image)
 
@@ -133,8 +131,8 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
                     </VStack>
                     <VStack>
                         <h2>Source</h2>
-                        <NumberInput id='img-width' label='Width' units='px' disabled controlled value={store.size.width} onChange={value => setStore('size', 'width', value)} />
-                        <NumberInput id='img-height' label='Height' units='px' disabled controlled value={store.size.height} onChange={value => setStore('size', 'height', value)} />
+                        <NumberInput id='img-width' label='Width' units='px' disabled value={store.size.width} onChange={value => setStore('size', 'width', value)} />
+                        <NumberInput id='img-height' label='Height' units='px' disabled value={store.size.height} onChange={value => setStore('size', 'height', value)} />
                         <h2>Actions</h2>
                     </VStack>
                 </HStack>

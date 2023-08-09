@@ -2,7 +2,7 @@ import { createEffect, Switch, Match, Show, onCleanup } from 'solid-js'
 import { SetStoreFunction, StoreSetter, createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
-import { generate } from './generate'
+import { GetFaceDimensionsOptions, generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
@@ -14,13 +14,11 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
 import { Download as DownloadIcon } from '@suid/icons-material'
-import { Font, Size, Face, RGB } from './types'
+import { Font, Size, Face, RGB, Faces } from './types'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
 import { ToggleSwitch } from './components/toggle-switch'
-
-type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
 
 interface Config {
     units: Units
@@ -96,31 +94,32 @@ const defualtConfig: Config = {
 }
 
 interface FaceComponentProps {
-    id: string
-    face: Face
+    id: Faces
+    value: Face
     width: number
     height: number
+    options: GetFaceDimensionsOptions
     setValue: (...params: any[]) => void
 }
 
 const FaceComponent = (props: FaceComponentProps) => 
     <VStack alignItems='flex-start'>
-        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.face.text} onChange={text => props.setValue({ text })} />
+        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => props.setValue({ text })} />
         <HStack>
-            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.face.font.family} onChange={family => props.setValue('font', { family })}>
+            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
                 <Select.Item value='Courier'>Courier</Select.Item>
                 <Select.Item value='Helvetica'>Helvetica</Select.Item>
                 <Select.Item value='Times-Roman'>Times Roman</Select.Item>
             </Select>
-            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer value={props.face.font.size} onChange={size => props.setValue('font', { size })} />
-            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.face.font.weight} onChange={weight => props.setValue('font', { weight })} />
+            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
+            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
         </HStack>
         <HStack>
-            <ColorPicker id={`${props.id}-font-color`} label='Font Color' color={props.face.font.color} onChange={color => props.setValue('font', { color })} />
-            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' color={props.face.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
-            <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' value={props.face.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
+            <ColorPicker id={`${props.id}-font-color`} label='Font Color' color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
+            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
+            <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
         </HStack>
-        <ImageSelect id={`${props.id}-image`} label='Image' imageWidth={props.width} imageHeight={props.height} onChange={image => props.setValue({ image: image.toDataURL() })}/>
+        <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensions(props.id, props.options)} onChange={image => props.setValue({ image: image.toDataURL() })}/>
     </VStack>
 
 export const App = () => {
@@ -291,6 +290,15 @@ export const App = () => {
         window.open(url, 'pdf')
     }
 
+    const faceDimensions = (): GetFaceDimensionsOptions => {
+        const size = {
+            width: convert(config.size.width, config.units, 'px'),
+            height: convert(config.size.height, config.units, 'px'),
+            depth: convert(config.size.depth, config.units, 'px')
+        }
+        return { size, thickness: config.thickness, bleed: config.bleed }
+    }
+
     return <HStack spacing={8} width='100%' height='100%'>
         <VStack>
             <h2>Page & Print</h2>
@@ -334,30 +342,30 @@ export const App = () => {
             </HStack>
             <Switch>
                 <Match when={config.view.face == 'front'}>
-                    <FaceComponent id='front-face' face={config.face.front} width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'front')} />
+                    <FaceComponent id='front' options={faceDimensions()} value={config.face.front} width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'front')} />
                 </Match>
                 <Match when={config.view.face == 'back'}>
                     <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
                     <Show when={!config.face.back.sameAsFront}>
-                        <FaceComponent id='back-face' face={config.face.back}  width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+                        <FaceComponent id='back' options={faceDimensions()} value={config.face.back}  width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'back')}/>
                     </Show>
                 </Match>
                 <Match when={config.view.face == 'top'}>
-                    <FaceComponent id='top-face' face={config.face.top}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'top')} />
+                    <FaceComponent id='top' options={faceDimensions()} value={config.face.top}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'top')} />
                 </Match>
                 <Match when={config.view.face == 'bottom'}>
                     <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
                     <Show when={!config.face.bottom.sameAsTop}>
-                        <FaceComponent id='bottom-face' face={config.face.bottom}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
+                        <FaceComponent id='bottom' options={faceDimensions()} value={config.face.bottom}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
                     </Show>
                 </Match>
                 <Match when={config.view.face == 'left'}>
-                    <FaceComponent id='left-face' face={config.face.left}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'left')} />
+                    <FaceComponent id='left' options={faceDimensions()} value={config.face.left}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'left')} />
                 </Match>
                 <Match when={config.view.face == 'right'}>
                     <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
                     <Show when={!config.face.right.sameAsLeft}>
-                        <FaceComponent id='right-face' face={config.face.right}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'right')}/>
+                        <FaceComponent id='right' options={faceDimensions()} value={config.face.right}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'right')}/>
                     </Show>
                 </Match>
             </Switch>

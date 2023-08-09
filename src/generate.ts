@@ -1,5 +1,5 @@
-import { mm2pt, convert, in2pt } from './convert'
-import { Size, Font, RGB } from './types'
+import { in2pt } from './convert'
+import { Size, Font, RGB, Faces } from './types'
 
 export interface FaceOptions {
     text?: string,
@@ -23,6 +23,12 @@ export interface GenerateOptions {
     }
 }
 
+export interface GetFaceDimensionsOptions {
+    size: Size
+    thickness: number
+    bleed: number
+}
+
 const defaultText = 'Sample'
 const defaultFont: Font = {
     family: 'Times-Roman',
@@ -31,6 +37,26 @@ const defaultFont: Font = {
     color: { r: 0, g: 0, b: 0 },
     outlineColor: { r: 255, g: 255, b: 255 },
     outlineWidth: 0
+}
+
+export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions): [number, number] {
+    const width = options.size.width + options.thickness * 2 - options.bleed * 2
+    const height = options.size.height + options.thickness * 2 - options.bleed * 2
+    const depth = options.size.depth + options.thickness * 2 - options.bleed * 2
+
+    switch (face) {
+        case 'front':
+        case 'back':
+            return [width, height]
+        case 'left':
+        case 'right':
+            return [depth, height]
+        case 'top':
+        case 'bottom':
+            return [width, depth]
+        default:
+            return [0, 0]
+    }
 }
 
 export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
@@ -262,11 +288,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement, r: number = 0) => {
+        const b = options.bleed
+
         ctx.save()
-        ctx.translate(tx, ty)
+        ctx.translate(tx + b, ty + b)
         ctx.rotate(r)
        
-        ctx.drawImage(image, 0, 0, tw, th)
+        ctx.drawImage(image, 0, 0, tw - b * 2, th - b * 2)
 
         ctx.restore()
     }
@@ -334,6 +362,11 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     // images
     ctx.save()
     {
+        // clip within outline
+        ctx.beginPath()
+        pathOutline()
+        ctx.clip()
+
         if (options.face.front.image)
             drawImage(front.x, front.y, front.width, front.height, options.face.front.image)
 
