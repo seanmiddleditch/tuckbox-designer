@@ -21,6 +21,8 @@ export interface Size {
     depth: number
 }
 
+export type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
+
 export interface Face {
     text: string
     font: Font
