@@ -61,14 +61,13 @@ export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions
 
 export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
     // expand size to account for paper thickness
-    const margin = in2pt(.25)
     const size = {
         width: options.size.width + options.thickness * 2,
         height: options.size.height + options.thickness * 2,
         depth: options.size.depth + options.thickness * 2
     }
 
-    const offset = { x: size.depth + margin, y: size.depth + size.width * 0.2 + margin }
+    const offset = { x: size.depth + options.margin, y: size.depth + size.width * 0.2 + options.margin }
     const front = { x: offset.x, y: offset.y, width: size.width, height: size.height }
     const back = { x: front.x + front.width + size.depth, y: front.y, width: front.width, height: front.height }
 
@@ -305,12 +304,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     if (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1) {
         ctx.setLineDash([])
         ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
+        ctx.strokeStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
+        ctx.lineWidth = options.bleed * 2
 
-        ctx.fillRect(front.x - size.depth - options.bleed,
-            front.y - size.depth * 1.5 - options.bleed,
-            front.width + back.width + size.depth * 2.9 + options.bleed * 2,
-            front.height + size.depth * 2.5 + options.bleed * 2)
+        ctx.beginPath()
 
+        pathOutline()
+        ctx.stroke()
         ctx.fill()
     }
     ctx.restore()
