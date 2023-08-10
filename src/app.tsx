@@ -58,7 +58,7 @@ const defaultFont: Font = {
     weight: 700,
     color: { r: 0, g: 0, b: 0 },
     outlineColor: { r: 255, g: 255, b: 255 },
-    outlineWidth: 0,
+    outlineWidth: 3,
 }
 
 const defaultFace: Face = {

@@ -50,7 +50,7 @@ export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions
             return [width, height]
         case 'left':
         case 'right':
-            return [depth, height]
+            return [height, depth]
         case 'top':
         case 'bottom':
             return [width, depth]
@@ -272,11 +272,13 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         // top
         if (options.face.top.text && options.face.top.font)
-            writeLine(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, front.width * 0.9)
+            writeCenterAngle(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, Math.PI, back.width * 0.9)
+            //writeLine(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, front.width * 0.9)
 
         // bottom
         if (options.face.bottom.text && options.face.bottom.font)
-            writeCenterAngle(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, back.width * 0.9)
+            writeLine(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y  + front.height + size.depth * 0.5, front.width * 0.9)
+            //writeCenterAngle(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, back.width * 0.9)
 
         // left
         if (options.face.left.text && options.face.left.font)
@@ -291,11 +293,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         const b = options.bleed
 
         ctx.save()
-        ctx.translate(tx + b, ty + b)
+        ctx.translate(tx, ty)
         ctx.rotate(r)
-       
-        ctx.drawImage(image, 0, 0, tw - b * 2, th - b * 2)
 
+        // adjust for bleed, which is relative to the rotated offset (must be after rotate)
+        ctx.translate(b, b)
+       
+        // image is drawn within the bleed area of the requested rect
+        ctx.drawImage(image, 0, 0, tw - b * 2, th - b * 2)
         ctx.restore()
     }
 
@@ -375,10 +380,10 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             drawImage(back.x, back.y, back.width, back.height, options.face.back.image)
 
         if (options.face.top.image)
-            drawImage(front.x, front.y - size.depth, front.width, size.depth, options.face.top.image)
+            drawImage(front.x + front.width, front.y, front.width, size.depth, options.face.top.image, Math.PI)
 
         if (options.face.bottom.image)
-            drawImage(front.x + front.width, front.y + front.height + size.depth, front.width, size.depth, options.face.bottom.image, Math.PI)
+            drawImage(front.x, front.y + front.height, front.width, size.depth, options.face.bottom.image)
 
         if (options.face.left.image)
             drawImage(front.x - size.depth, front.y + front.height, front.height, size.depth, options.face.left.image, Math.PI * 1.5)
