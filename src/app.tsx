@@ -20,6 +20,7 @@ import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
 import { ToggleSwitch } from './components/toggle-switch'
+import { Checkbox, FormControlLabel, FormGroup } from '@suid/material'
 
 interface Config {
     units: Units
@@ -27,6 +28,7 @@ interface Config {
     title: string
     color: RGB
     view: {
+        advanced: boolean
         preview: 'canvas' | 'pdf',
         face: Faces
     }
@@ -74,6 +76,7 @@ const defualtConfig: Config = {
     title: 'Sample',
     color: { r: 255, g: 255, b: 255 },
     view: {
+        advanced: false,
         preview: 'canvas',
         face: 'front',
     },
@@ -300,17 +303,17 @@ export const App = () => {
         
     // Update previews
     createEffect(() => {
+        const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
+
+        const detailsDiv = pageDetailsDiv()
+        if (detailsDiv) {
+            detailsDiv.textContent = `${config.page} ${Number.parseFloat(pageSize[0].toFixed(2))}x${Number.parseFloat(pageSize[1].toFixed(2))}${config.units}`
+        }
+
         if (config.view.preview == 'canvas') {
-            const detailsDiv = pageDetailsDiv()
             const canvas = previewCanvas()
-
-            if (!detailsDiv || !canvas)
+            if (!canvas)
                 return
-
-            // page dimensions
-            const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
-
-            detailsDiv.textContent = `${config.page} ${pageSize[0]}x${pageSize[1]}${config.units}`
 
             canvas.width = convert(pageSize[0], config.units, 'pt')
             canvas.height = convert(pageSize[1], config.units, 'pt')
@@ -403,7 +406,12 @@ export const App = () => {
     return <Show when={!state.loading} fallback={'Loading...'}>
         <HStack spacing={8} width='100%' height='100%'>
             <VStack>
-                <h2>Page & Print</h2>
+                <HStack alignItems='center'>
+                    <h2>Page & Print</h2>
+                    <FormGroup>
+                        <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
+                    </FormGroup>
+                </HStack>
                 <HStack>
                     <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
                         <Select.Item value='letter'>US Letter</Select.Item>
@@ -416,11 +424,13 @@ export const App = () => {
                         <Select.Item value='pt'>points</Select.Item>
                     </Select>
                 </HStack>
-                <HStack>
-                    <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
-                    <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
-                    <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
-                </HStack>
+                <Show when={config.view.advanced}>
+                    <HStack>
+                        <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                        <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
+                        <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
+                    </HStack>
+                </Show>
                 <h2>Deck Setup</h2>
                 <VStack alignItems='flex-start'>
                     <HStack>
@@ -433,14 +443,14 @@ export const App = () => {
                 </VStack>
                 <HStack alignItems='baseline'>
                     <h2>Faces</h2>
-                    <ToggleButton value={config.view.face} onChange={value => setConfig('view', 'face', value)} style={{ height: '2.5em', 'vertical-align': 'end' }}>
-                        <ToggleButton.Item value='front'>Front</ToggleButton.Item>
-                        <ToggleButton.Item value='back'>Back</ToggleButton.Item>
-                        <ToggleButton.Item value='top'>Top</ToggleButton.Item>
-                        <ToggleButton.Item value='bottom'>Bottom</ToggleButton.Item>
-                        <ToggleButton.Item value='left'>Left</ToggleButton.Item>
-                        <ToggleButton.Item value='right'>Right</ToggleButton.Item>
-                    </ToggleButton>
+                    <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
+                        <Select.Item value='front'>Front</Select.Item>
+                        <Select.Item value='back'>Back</Select.Item>
+                        <Select.Item value='top'>Top</Select.Item>
+                        <Select.Item value='bottom'>Bottom</Select.Item>
+                        <Select.Item value='left'>Left</Select.Item>
+                        <Select.Item value='right'>Right</Select.Item>
+                    </Select>
                 </HStack>
                 <Switch>
                     <Match when={config.view.face == 'front'}>
@@ -484,12 +494,11 @@ export const App = () => {
                 <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
             </VStack>
             <VStack width='100%' alignItems='flex-start'>
-                <HStack alignItems='baseline'>
+                <HStack alignItems='center'>
                     <h2>Preview</h2>
-                    <ToggleButton exclusive style={{ height: '2.5em', 'vertical-align': 'end' }} value={config.view.preview} onChange={value => setConfig('view', 'preview', value)}>
-                        <ToggleButton.Item value='canvas'>Canvas</ToggleButton.Item>
-                        <ToggleButton.Item value='pdf'>PDF</ToggleButton.Item>
-                    </ToggleButton>
+                    <FormGroup>
+                        <FormControlLabel label='Live PDF' control={<Checkbox checked={config.view.preview == 'pdf'} onChange={(_, checked) => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />} />
+                    </FormGroup>
                 </HStack>
                 <Switch fallback={<>
                     <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
