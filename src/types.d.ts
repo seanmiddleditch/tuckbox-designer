@@ -24,10 +24,13 @@ export interface Size {
 export type Faces = 'front' | 'back' | 'top' | 'bottom' | 'left' | 'right'
 
 export interface CropData {
-    x: number,
-    y: number,
-    width: number,
+    x: number
+    y: number
+    width: number
     height: number
+    rotate: number
+    scaleX: number
+    scaleY: number
 }
 
 export interface Face {

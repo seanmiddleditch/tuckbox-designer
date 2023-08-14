@@ -1,8 +1,8 @@
 import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal } from 'solid-js'
-import { SetStoreFunction, StoreSetter, createStore } from 'solid-js/store'
+import { createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
-import { GetFaceDimensionsOptions, generate, getFaceDimensions } from './generate'
+import {  generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
@@ -13,9 +13,9 @@ import { ColorPicker } from './components/color-picker'
 import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
-import { Modal } from '@suid/material'
 import { Download as DownloadIcon } from '@suid/icons-material'
-import { Font, Size, Face, RGB, Faces } from './types'
+import { Font, Size, Face, RGB, Faces, CropData } from './types'
+import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
@@ -65,7 +65,7 @@ const defaultFont: Font = {
 const defaultFace: Face = {
     text: '',
     font: defaultFont,
-    crop: { x: 0, y: 0, width: 0, height: 0 }
+    crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 }
 }
 
 const defualtConfig: Config = {
@@ -104,19 +104,32 @@ interface AppState {
     loading: boolean
 }
 
-const loadImage = (blob: Blob): Promise<HTMLCanvasElement> => {
+const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
+
+const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RGB): Promise<HTMLCanvasElement> => {
     const img = new Image()
     const url = URL.createObjectURL(blob)
     const promise = new Promise<HTMLCanvasElement>((resolve, reject) => {
         img.onload = () => {
-            const canvas = document.createElement('canvas')
-            canvas.width = img.width
-            canvas.height = img.height
-            const ctx = canvas.getContext('2d')
-            if (ctx == null)
-                return reject(new Error('Failed to create 2d context'))
-            ctx.drawImage(img, 0, 0)
-            resolve(canvas)
+            document.body.appendChild(img)
+
+            // we fill in the background with our box color
+            // due to https://github.com/parallax/jsPDF/issues/816
+            const cropper = new Cropper(img, {
+                data: crop,
+                background: false,
+                ready: () => {
+                    const canvas = cropper.getCroppedCanvas({
+                        width: dims[0] || 400,
+                        height: dims[1] || 300,
+                        fillColor: `rgb(${color.r}, ${color.g}, ${color.b})`,
+                        imageSmoothingEnabled: true,
+                        imageSmoothingQuality: 'high'
+                    })
+                    document.body.removeChild(img)
+                    resolve(canvas)
+                }
+            })
         }
         img.onerror = reject
     })
@@ -140,11 +153,20 @@ export const App = () => {
     let pdfLinkRef: HTMLAnchorElement|undefined = undefined
 
     const toPt = (value: number) => convert(value, config.units, 'pt')
+    
+    const getFaceDimensionsPixels = (face: Faces): [number, number] => {
+        const size = {
+            width: config.size.width,
+            height: config.size.height,
+            depth: config.size.depth,
+        }
+        const dims = getFaceDimensions(face, { size, thickness: config.thickness, bleed: config.bleed })
+        return [convert(dims[0], config.units, 'px'), convert(dims[1], config.units, 'px')]
+    }
 
     // load up the image cache
     navigator.storage.getDirectory()
         .then(dir => {
-            const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
             return Promise.all(faces.map(async (face) => {
                 let h: FileSystemFileHandle
                 try {
@@ -156,11 +178,7 @@ export const App = () => {
                     return
                 }
                 const file = await h.getFile()
-                const canvas = await loadImage(file)
-                batch(() => {
-                    setImageCache(face, canvas)
-                    setBlobCache(face, file)
-                })
+                setBlobCache(face, file)
             }))
         })
         .catch(err => console.error(err))
@@ -173,7 +191,6 @@ export const App = () => {
             blob.stream().pipeTo(writeable)
         })
         .catch(err => console.error(err))
-        .finally(() => console.log('Done'))
     }
 
     const deleteImage = (face: Faces) => {
@@ -189,6 +206,21 @@ export const App = () => {
             URL.revokeObjectURL(pdfDataUrl)
             pdfDataUrl = ''
         }
+    })
+
+    // Update canvas caches of images
+    faces.map(face => {
+        createEffect(() => {
+            const blob = blobCache[face]
+            if (blob && config.face[face].crop) {
+                // we need to read the properties themselves to be reactive
+                const { x, y, width, height, scaleX, scaleY, rotate } = config.face[face].crop
+
+                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), config.color).then(canvas => setImageCache(face, canvas))
+            } else {
+                setImageCache(face, undefined)
+            }
+        })
     })
 
     const changeUnits = (units: Units) => {
@@ -324,16 +356,6 @@ export const App = () => {
         window.open(url, 'pdf')
     }
     
-    const getFaceDimensionsPixels = (face: Faces): [number, number] => {
-        const size = {
-            width: config.size.width,
-            height: config.size.height,
-            depth: config.size.depth,
-        }
-        const dims = getFaceDimensions(face, { size, thickness: config.thickness, bleed: config.bleed })
-        return [convert(dims[0], config.units, 'px'), convert(dims[1], config.units, 'px')]
-    }
-    
     const FaceComponent = (props: FaceComponentProps) => 
         <VStack alignItems='flex-start'>
             <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => setConfig('face', props.id, { text })}/>
@@ -353,15 +375,21 @@ export const App = () => {
             </HStack>
             <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} blob={blobCache[props.id]} cropData={config.face[props.id].crop} onChange={result => batch(() => {
                 if (result) {
-                    setImageCache(props.id, result.canvas)
                     if (result.blob !== blobCache[props.id]) {
                         setBlobCache(props.id, result.blob)
                         saveImage(props.id, result.blob)
                     }
-                    setConfig('face', props.id, 'crop', { x: result.cropData.x, y: result.cropData.y, width: result.cropData.width, height: result.cropData.height })
+                    setConfig('face', props.id, 'crop', {
+                        x: result.cropData.x,
+                        y: result.cropData.y,
+                        width: result.cropData.width,
+                        height: result.cropData.height,
+                        rotate: result.cropData.rotate,
+                        scaleX: result.cropData.scaleX,
+                        scaleY: result.cropData.scaleY,
+                    })
                 }
                 else {
-                    setImageCache(props.id, undefined)
                     setBlobCache(props.id, undefined)
                     deleteImage(props.id)
                     setConfig('face', props.id, 'crop', defaultFace.crop)

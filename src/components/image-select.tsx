@@ -24,6 +24,7 @@ interface ImageSelectStore {
     image?: HTMLImageElement
     file?: Blob
     cropData?: CropData
+    cropState?: CropData
     cropper?: Cropper
 }
 
@@ -41,7 +42,6 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
     })
 
     const updateCropper = (blob: Blob, image: HTMLImageElement) => {
-        console.log('Update: ', !!blob, !!image)
         if (!blob || !image)
             return
         
@@ -52,11 +52,9 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
                     const cropper = new Cropper(image, {
                         aspectRatio,
                         autoCropArea: 1,
-                        data: store.cropData,
+                        data: unwrap(store.cropData),
                         crop(event) {
-                            batch(() => {
-                                setStore('cropData', event.detail)
-                            })
+                            setStore('cropState', event.detail)
                         }
                     })
                     setStore({ cropper })
@@ -183,10 +181,10 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
                                 <Button disabled={!store.cropper} onClick={() => store.cropper?.rotate(+90)}><Rotate90DegreesCwRounded/></Button>
                                 <Button disabled={!store.cropper} onClick={() => store.cropper?.rotate(-90)}><Rotate90DegreesCcwRounded/></Button>
                             </ButtonGroup>
-                            {/* <ButtonGroup>
-                                <Button disabled={!store.cropper} onClick={() => setStore('scale', 'x', store.scale.x * -1)}><SwapHorizRounded/></Button>
-                                <Button disabled={!store.cropper} onClick={() => setStore('scale', 'y', store.scale.y * -1)}><SwapVertRounded/></Button>
-                            </ButtonGroup> */}
+                            <ButtonGroup>
+                                <Button disabled={!store.cropper} onClick={() => store.cropper?.scaleX((store.cropState?.scaleX ?? 1) * -1)}><SwapHorizRounded /></Button>
+                                <Button disabled={!store.cropper} onClick={() => store.cropper?.scaleY((store.cropState?.scaleY ?? 1) * -1)}><SwapVertRounded/></Button>
+                            </ButtonGroup>
                             <ButtonGroup>
                                 <Button onClick={onClear}><ClearRounded/> Clear</Button>
                             </ButtonGroup>
@@ -196,8 +194,8 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
                         </HStack>
                     </VStack>
                     <VStack>
-                        <NumberInput id='img-width' label='Width' units='px' disabled value={Math.round(store.cropData?.width ?? 0)}/>
-                        <NumberInput id='img-height' label='Height' units='px' disabled value={Math.round(store.cropData?.height ?? 0)} />
+                        <NumberInput id='img-width' label='Width' units='px' disabled value={Math.round(store.cropState?.width ?? 0)}/>
+                        <NumberInput id='img-height' label='Height' units='px' disabled value={Math.round(store.cropState?.height ?? 0)} />
                     </VStack>
                 </HStack>
             </Box>
