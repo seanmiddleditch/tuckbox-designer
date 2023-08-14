@@ -1,10 +1,9 @@
-import { in2pt } from './convert'
 import { Size, Font, RGB, Faces } from './types'
 
 export interface FaceOptions {
-    text?: string,
-    font?: Font,
-    image?: HTMLImageElement,
+    text?: string
+    font?: Font
+    image?: HTMLCanvasElement
 }
 
 export interface GenerateOptions {
@@ -80,7 +79,6 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         if (font.outlineWidth > 0) {
             ctx.strokeStyle = `rgb(${font.outlineColor.r}, ${font.outlineColor.g}, ${font.outlineColor.b})`
             ctx.lineWidth = font.outlineWidth
-            console.log(font.outlineWidth)
         }
         else {
             ctx.strokeStyle = `rgba(1, 1, 1, 0)`
@@ -289,7 +287,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             writeCenterAngle(options.face.right.text, options.face.right.font, front.x + front.width + size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height * 0.9)
     }
 
-    const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLImageElement, r: number = 0) => {
+    const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLCanvasElement, r: number = 0) => {
         const b = options.bleed
 
         ctx.save()

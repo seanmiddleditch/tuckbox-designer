@@ -1,4 +1,4 @@
-import { createEffect, Switch, Match, Show, onCleanup } from 'solid-js'
+import { createEffect, Switch, Match, Show, onCleanup, batch } from 'solid-js'
 import { SetStoreFunction, StoreSetter, createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
@@ -13,6 +13,7 @@ import { ColorPicker } from './components/color-picker'
 import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { ImageSelect } from './components/image-select'
+import { Modal } from '@suid/material'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces } from './types'
 import patchJsPdf from './jspdf-patch'
@@ -44,12 +45,12 @@ interface Config {
 }
 
 interface FaceImageCache {
-    front?: HTMLImageElement
-    back?: HTMLImageElement
-    top?: HTMLImageElement
-    bottom?: HTMLImageElement
-    left?: HTMLImageElement
-    right?: HTMLImageElement
+    front?: HTMLCanvasElement
+    back?: HTMLCanvasElement
+    top?: HTMLCanvasElement
+    bottom?: HTMLCanvasElement
+    left?: HTMLCanvasElement
+    right?: HTMLCanvasElement
 }
 
 const defaultFont: Font = {
@@ -64,6 +65,7 @@ const defaultFont: Font = {
 const defaultFace: Face = {
     text: '',
     font: defaultFont,
+    crop: { x: 0, y: 0, width: 0, height: 0 }
 }
 
 const defualtConfig: Config = {
@@ -96,34 +98,43 @@ const defualtConfig: Config = {
 interface FaceComponentProps {
     id: Faces
     value: Face
-    width: number
-    height: number
-    options: GetFaceDimensionsOptions
     setValue: (...params: any[]) => void
 }
 
-const FaceComponent = (props: FaceComponentProps) => 
-    <VStack alignItems='flex-start'>
-        <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => props.setValue({ text })} />
-        <HStack>
-            <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
-                <Select.Item value='Courier'>Courier</Select.Item>
-                <Select.Item value='Helvetica'>Helvetica</Select.Item>
-                <Select.Item value='Times-Roman'>Times Roman</Select.Item>
-            </Select>
-            <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
-            <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
-        </HStack>
-        <HStack>
-            <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
-            <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
-            <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
-        </HStack>
-        <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensions(props.id, props.options)} onChange={image => props.setValue({ image: image.toDataURL() })}/>
-    </VStack>
+interface AppState {
+    loading: boolean
+}
+
+const loadImage = (blob: Blob): Promise<HTMLCanvasElement> => {
+    const img = new Image()
+    const url = URL.createObjectURL(blob)
+    const promise = new Promise<HTMLCanvasElement>((resolve, reject) => {
+        img.onload = () => {
+            const canvas = document.createElement('canvas')
+            canvas.width = img.width
+            canvas.height = img.height
+            const ctx = canvas.getContext('2d')
+            if (ctx == null)
+                return reject(new Error('Failed to create 2d context'))
+            ctx.drawImage(img, 0, 0)
+            resolve(canvas)
+        }
+        img.onerror = reject
+    })
+    .finally(() => URL.revokeObjectURL(url))
+    img.src = url
+    return promise
+}
+
+const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
+    new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => {
+        if (blob) resolve(blob)
+        else reject(new Error('Failed to convert canvas to Blob'))
+    }))
 
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
+    const [state, setState] = createStore<AppState>({loading: true})
     const [imageCache, setImageCache] = createStore<FaceImageCache>({})
     
     let pdfDataUrl = ''
@@ -134,7 +145,31 @@ export const App = () => {
     let previewFrameRef: HTMLIFrameElement|undefined = undefined
 
     const toPt = (value: number) => convert(value, config.units, 'pt')
-    const toPx = (value: number) => convert(value, config.units, 'px')
+
+    navigator.storage.getDirectory()
+        .then(dir => Promise.all([
+            dir.getFileHandle('front').then(h => h.getFile()).then(loadImage).catch(_ => undefined).then(img => setImageCache({ front: img })),
+            dir.getFileHandle('back').then(h => h.getFile()).then(loadImage).catch(_ => undefined).then(img => setImageCache({ back: img })),
+        ]))
+        .catch(err => console.error(err))
+        .finally(() => setState({ loading: false }))
+    
+    const saveImage = (face: Faces, canvas: HTMLCanvasElement) => {
+        canvasToBlob(canvas).then(async (blob) => {
+            const dir = await navigator.storage.getDirectory()
+            const handle = await dir.getFileHandle(face, { create: true })
+            const writeable = await handle.createWritable()
+            blob.stream().pipeTo(writeable)
+        })
+        .catch(err => console.error(err))
+        .finally(() => console.log('Done'))
+    }
+
+    const deleteImage = (face: Faces) => {
+        navigator.storage.getDirectory()
+            .then(dir => dir.removeEntry(face))
+            .catch(err => err.name != 'NotFoundError' ?  console.error(err) : false)
+    }
 
     // Release the cached PDF data url (not important in a top-level app
     // content, but good practice anyway)
@@ -143,27 +178,6 @@ export const App = () => {
             URL.revokeObjectURL(pdfDataUrl)
             pdfDataUrl = ''
         }
-    })
-    
-    // Update the Image caches for each face based on the stored data URL
-    createEffect(() => {
-        const op = (face: Face, name: Faces) => {
-            if (face.image) {
-                const img = new Image()
-                img.onload = () => setImageCache({ [name]: img })
-                img.src = face.image
-            }
-            else {
-                setImageCache({ [name]: undefined })
-            }
-        }
-
-        op(config.face.front, 'front')
-        op(config.face.back, 'back')
-        op(config.face.top, 'top')
-        op(config.face.bottom, 'bottom')
-        op(config.face.left, 'left')
-        op(config.face.right, 'right')
     })
 
     const changeUnits = (units: Units) => {
@@ -289,114 +303,150 @@ export const App = () => {
 
         window.open(url, 'pdf')
     }
-
-    const faceDimensions = (): GetFaceDimensionsOptions => {
+    
+    const getFaceDimensionsPixels = (face: Faces): [number, number] => {
         const size = {
-            width: convert(config.size.width, config.units, 'px'),
-            height: convert(config.size.height, config.units, 'px'),
-            depth: convert(config.size.depth, config.units, 'px')
+            width: config.size.width,
+            height: config.size.height,
+            depth: config.size.depth,
         }
-        return { size, thickness: config.thickness, bleed: config.bleed }
+        const dims = getFaceDimensions(face, { size, thickness: config.thickness, bleed: config.bleed })
+        return [convert(dims[0], config.units, 'px'), convert(dims[1], config.units, 'px')]
     }
+    
+    const FaceComponent = (props: FaceComponentProps) => 
+        <VStack alignItems='flex-start'>
+            <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => props.setValue({ text })} />
+            <HStack>
+                <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
+                    <Select.Item value='Courier'>Courier</Select.Item>
+                    <Select.Item value='Helvetica'>Helvetica</Select.Item>
+                    <Select.Item value='Times-Roman'>Times Roman</Select.Item>
+                </Select>
+                <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
+                <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
+            </HStack>
+            <HStack>
+                <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
+                <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
+                <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
+            </HStack>
+            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} value={imageCache[props.id]} onChange={result => batch(() => {
+                if (result) {
+                    setImageCache(props.id, result.canvas)
+                    saveImage(props.id, result.canvas)
+                    props.setValue('crop', { x: result.cropData.x, y: result.cropData.y, width: result.cropData.width, height: result.cropData.height })
+                }
+                else {
+                    setImageCache(props.id, undefined)
+                    deleteImage(props.id)
+                }
+            })} />
+        </VStack>
 
-    return <HStack spacing={8} width='100%' height='100%'>
-        <VStack>
-            <h2>Page & Print</h2>
-            <HStack>
-                <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
-                    <Select.Item value='letter'>US Letter</Select.Item>
-                    <Select.Item value='a4'>A4</Select.Item>
-                </Select>
-                <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
-                    <Select.Item value='cm'>centimeters</Select.Item>
-                    <Select.Item value='mm'>millimeters</Select.Item>
-                    <Select.Item value='in'>inches</Select.Item>
-                    <Select.Item value='pt'>points</Select.Item>
-                </Select>
-            </HStack>
-            <HStack>
-                <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
-                <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
-                <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
-            </HStack>
-            <h2>Deck Setup</h2>
-            <VStack alignItems='flex-start'>
-                <HStack>
-                    <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                    <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                    <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
-                </HStack>
-                <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
-                <ColorPicker id='box-color' label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
-            </VStack>
-            <HStack alignItems='baseline'>
-                <h2>Faces</h2>
-                <ToggleButton value={config.view.face} onChange={value => setConfig('view', 'face', value)} style={{ height: '2.5em', 'vertical-align': 'end' }}>
-                    <ToggleButton.Item value='front'>Front</ToggleButton.Item>
-                    <ToggleButton.Item value='back'>Back</ToggleButton.Item>
-                    <ToggleButton.Item value='top'>Top</ToggleButton.Item>
-                    <ToggleButton.Item value='bottom'>Bottom</ToggleButton.Item>
-                    <ToggleButton.Item value='left'>Left</ToggleButton.Item>
-                    <ToggleButton.Item value='right'>Right</ToggleButton.Item>
-                </ToggleButton>
-            </HStack>
-            <Switch>
-                <Match when={config.view.face == 'front'}>
-                    <FaceComponent id='front' options={faceDimensions()} value={config.face.front} width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'front')} />
-                </Match>
-                <Match when={config.view.face == 'back'}>
-                    <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
-                    <Show when={!config.face.back.sameAsFront}>
-                        <FaceComponent id='back' options={faceDimensions()} value={config.face.back}  width={toPx(config.size.width)} height={toPx(config.size.height)} setValue={setConfig.bind(undefined, 'face', 'back')}/>
-                    </Show>
-                </Match>
-                <Match when={config.view.face == 'top'}>
-                    <FaceComponent id='top' options={faceDimensions()} value={config.face.top}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'top')} />
-                </Match>
-                <Match when={config.view.face == 'bottom'}>
-                    <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
-                    <Show when={!config.face.bottom.sameAsTop}>
-                        <FaceComponent id='bottom' options={faceDimensions()} value={config.face.bottom}  width={toPx(config.size.width)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
-                    </Show>
-                </Match>
-                <Match when={config.view.face == 'left'}>
-                    <FaceComponent id='left' options={faceDimensions()} value={config.face.left}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'left')} />
-                </Match>
-                <Match when={config.view.face == 'right'}>
-                    <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
-                    <Show when={!config.face.right.sameAsLeft}>
-                        <FaceComponent id='right' options={faceDimensions()} value={config.face.right}  width={toPx(config.size.height)} height={toPx(config.size.depth)} setValue={setConfig.bind(undefined, 'face', 'right')}/>
-                    </Show>
-                </Match>
-            </Switch>
-            <h2>Download</h2>
+    return <>
+        <Modal open={state.loading}>
+            Loading...
+        </Modal>
+        <HStack spacing={8} width='100%' height='100%'>
             <VStack>
-                <Button.Group>
-                    <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
-                    <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
-                </Button.Group>
-                <Button.Group>
-                    <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
-                </Button.Group>
+                <h2>Page & Print</h2>
+                <HStack>
+                    <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
+                        <Select.Item value='letter'>US Letter</Select.Item>
+                        <Select.Item value='a4'>A4</Select.Item>
+                    </Select>
+                    <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
+                        <Select.Item value='cm'>centimeters</Select.Item>
+                        <Select.Item value='mm'>millimeters</Select.Item>
+                        <Select.Item value='in'>inches</Select.Item>
+                        <Select.Item value='pt'>points</Select.Item>
+                    </Select>
+                </HStack>
+                <HStack>
+                    <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                    <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
+                    <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
+                </HStack>
+                <h2>Deck Setup</h2>
+                <VStack alignItems='flex-start'>
+                    <HStack>
+                        <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                        <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                        <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                    </HStack>
+                    <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
+                    <ColorPicker id='box-color' label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
+                </VStack>
+                <HStack alignItems='baseline'>
+                    <h2>Faces</h2>
+                    <ToggleButton value={config.view.face} onChange={value => setConfig('view', 'face', value)} style={{ height: '2.5em', 'vertical-align': 'end' }}>
+                        <ToggleButton.Item value='front'>Front</ToggleButton.Item>
+                        <ToggleButton.Item value='back'>Back</ToggleButton.Item>
+                        <ToggleButton.Item value='top'>Top</ToggleButton.Item>
+                        <ToggleButton.Item value='bottom'>Bottom</ToggleButton.Item>
+                        <ToggleButton.Item value='left'>Left</ToggleButton.Item>
+                        <ToggleButton.Item value='right'>Right</ToggleButton.Item>
+                    </ToggleButton>
+                </HStack>
+                <Switch>
+                    <Match when={config.view.face == 'front'}>
+                        <FaceComponent id='front' value={config.face.front} setValue={setConfig.bind(undefined, 'face', 'front')} />
+                    </Match>
+                    <Match when={config.view.face == 'back'}>
+                        <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
+                        <Show when={!config.face.back.sameAsFront}>
+                            <FaceComponent id='back' value={config.face.back} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+                        </Show>
+                    </Match>
+                    <Match when={config.view.face == 'top'}>
+                        <FaceComponent id='top' value={config.face.top} setValue={setConfig.bind(undefined, 'face', 'top')} />
+                    </Match>
+                    <Match when={config.view.face == 'bottom'}>
+                        <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
+                        <Show when={!config.face.bottom.sameAsTop}>
+                            <FaceComponent id='bottom' value={config.face.bottom} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
+                        </Show>
+                    </Match>
+                    <Match when={config.view.face == 'left'}>
+                        <FaceComponent id='left' value={config.face.left} setValue={setConfig.bind(undefined, 'face', 'left')} />
+                    </Match>
+                    <Match when={config.view.face == 'right'}>
+                        <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
+                        <Show when={!config.face.right.sameAsLeft}>
+                            <FaceComponent id='right' value={config.face.right} setValue={setConfig.bind(undefined, 'face', 'right')}/>
+                        </Show>
+                    </Match>
+                </Switch>
+                <h2>Download</h2>
+                <VStack>
+                    <Button.Group>
+                        <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
+                        <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
+                    </Button.Group>
+                    <Button.Group>
+                        <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
+                    </Button.Group>
+                </VStack>
+                <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
             </VStack>
-            <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
-        </VStack>
-        <VStack width='100%' alignItems='flex-start'>
-            <HStack alignItems='baseline'>
-                <h2>Preview</h2>
-                <ToggleButton exclusive style={{ height: '2.5em', 'vertical-align': 'end' }} value={config.view.preview} onChange={value => setConfig('view', 'preview', value)}>
-                    <ToggleButton.Item value='canvas'>Canvas</ToggleButton.Item>
-                    <ToggleButton.Item value='pdf'>PDF</ToggleButton.Item>
-                </ToggleButton>
-            </HStack>
-            <Switch fallback={<>
-                <canvas width="800" height="600" ref={canvasRef} style={{ border: '1px solid grey' }}></canvas>
-            </>}>
-                <Match when={config.view.preview == 'pdf'}>
-                    <iframe width="800" height="600" ref={previewFrameRef} style={{ border: 'none', width: '100%' }}></iframe>
-                </Match>
-            </Switch>
-            <div ref={pageDetailsRef}></div>
-        </VStack>
-    </HStack>
+            <VStack width='100%' alignItems='flex-start'>
+                <HStack alignItems='baseline'>
+                    <h2>Preview</h2>
+                    <ToggleButton exclusive style={{ height: '2.5em', 'vertical-align': 'end' }} value={config.view.preview} onChange={value => setConfig('view', 'preview', value)}>
+                        <ToggleButton.Item value='canvas'>Canvas</ToggleButton.Item>
+                        <ToggleButton.Item value='pdf'>PDF</ToggleButton.Item>
+                    </ToggleButton>
+                </HStack>
+                <Switch fallback={<>
+                    <canvas width="800" height="600" ref={canvasRef} style={{ border: '1px solid grey' }}></canvas>
+                </>}>
+                    <Match when={config.view.preview == 'pdf'}>
+                        <iframe width="800" height="600" ref={previewFrameRef} style={{ border: 'none', width: '100%' }}></iframe>
+                    </Match>
+                </Switch>
+                <div ref={pageDetailsRef}></div>
+            </VStack>
+        </HStack>
+    </>
 }

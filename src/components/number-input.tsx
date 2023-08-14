@@ -16,7 +16,6 @@ const isNumeric = (text: string) => /^[0-9]*([.][0-9]*)?$/.test(text)
 export const NumberInput: Component<NumberInputProps> = (props) => {
     const [value, setValue] = createSignal(props.value.toString())
 
-
     const onChange = (e: Event) => {
         const input = e.target as HTMLInputElement
         const newValue = input.value
@@ -37,7 +36,7 @@ export const NumberInput: Component<NumberInputProps> = (props) => {
     }
 
     return <TextField id={props.id} size='small' variant='outlined' sx={{ width: '14ch' }}
-        value={value()}
+        value={props.disabled ? props.value : value()}
         disabled={props.disabled}
         label={props.label}
         type={props.integer ? 'number' : 'text'}
