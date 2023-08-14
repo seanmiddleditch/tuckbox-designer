@@ -165,7 +165,7 @@ export const App = () => {
     }
 
     // load up the image cache
-    navigator.storage.getDirectory()
+    navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images', { create: true }))
         .then(dir => {
             return Promise.all(faces.map(async (face) => {
                 let h: FileSystemFileHandle
@@ -185,7 +185,7 @@ export const App = () => {
         .finally(() => setState({ loading: false }))
     
     const saveImage = (face: Faces, blob: Blob) => {
-        navigator.storage.getDirectory().then(async (dir) => {
+        navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images', { create: true })).then(async (dir) => {
             const handle = await dir.getFileHandle(face, { create: true })
             const writeable = await handle.createWritable()
             blob.stream().pipeTo(writeable)
@@ -194,7 +194,7 @@ export const App = () => {
     }
 
     const deleteImage = (face: Faces) => {
-        navigator.storage.getDirectory()
+        navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images'))
             .then(dir => dir.removeEntry(face))
             .catch(err => err.name != 'NotFoundError' ?  console.error(err) : false)
     }
@@ -332,8 +332,11 @@ export const App = () => {
     
     const resetConfig = () => {
         if (confirm('Reset all configuration?')) {
+            setState({ loading: true })
             localStorage.clear()
-            setConfig(defualtConfig)
+            navigator.storage.getDirectory().then(dir => dir.removeEntry('images', { recursive: true }))
+                .catch(err => err.name != 'NotFoundError' ? console.error(err) : false)
+                .then(() => window.location.reload())
         }
     }
 
