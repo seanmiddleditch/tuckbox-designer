@@ -1,4 +1,4 @@
-import { createEffect, Switch, Match, Show, onCleanup, batch } from 'solid-js'
+import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal } from 'solid-js'
 import { SetStoreFunction, StoreSetter, createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
@@ -44,13 +44,13 @@ interface Config {
     thickness: number
 }
 
-interface FaceImageCache {
-    front?: HTMLCanvasElement
-    back?: HTMLCanvasElement
-    top?: HTMLCanvasElement
-    bottom?: HTMLCanvasElement
-    left?: HTMLCanvasElement
-    right?: HTMLCanvasElement
+interface FaceCache<T> {
+    front?: T
+    back?: T
+    top?: T
+    bottom?: T
+    left?: T
+    right?: T
 }
 
 const defaultFont: Font = {
@@ -98,7 +98,6 @@ const defualtConfig: Config = {
 interface FaceComponentProps {
     id: Faces
     value: Face
-    setValue: (...params: any[]) => void
 }
 
 interface AppState {
@@ -126,37 +125,49 @@ const loadImage = (blob: Blob): Promise<HTMLCanvasElement> => {
     return promise
 }
 
-const canvasToBlob = (canvas: HTMLCanvasElement): Promise<Blob> =>
-    new Promise<Blob>((resolve, reject) => canvas.toBlob(blob => {
-        if (blob) resolve(blob)
-        else reject(new Error('Failed to convert canvas to Blob'))
-    }))
-
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [state, setState] = createStore<AppState>({loading: true})
-    const [imageCache, setImageCache] = createStore<FaceImageCache>({})
-    
+    const [imageCache, setImageCache] = createStore<FaceCache<HTMLCanvasElement>>({})
+    const [blobCache, setBlobCache] = createStore<FaceCache<Blob>>({})
+
+    const [pageDetailsDiv, setPageDetailsDiv] = createSignal<HTMLDivElement | undefined>(undefined)
+    const [previewCanvas, setPreviewCanvas] = createSignal<HTMLCanvasElement | undefined>(undefined)
+    const [previewFrame, setPreviewFrame] = createSignal<HTMLIFrameElement | undefined>(undefined)
+        
     let pdfDataUrl = ''
     let pdfBlob: Blob|undefined = undefined
-    let pageDetailsRef: HTMLDivElement|undefined = undefined
-    let canvasRef: HTMLCanvasElement|undefined = undefined
     let pdfLinkRef: HTMLAnchorElement|undefined = undefined
-    let previewFrameRef: HTMLIFrameElement|undefined = undefined
 
     const toPt = (value: number) => convert(value, config.units, 'pt')
 
+    // load up the image cache
     navigator.storage.getDirectory()
-        .then(dir => Promise.all([
-            dir.getFileHandle('front').then(h => h.getFile()).then(loadImage).catch(_ => undefined).then(img => setImageCache({ front: img })),
-            dir.getFileHandle('back').then(h => h.getFile()).then(loadImage).catch(_ => undefined).then(img => setImageCache({ back: img })),
-        ]))
+        .then(dir => {
+            const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
+            return Promise.all(faces.map(async (face) => {
+                let h: FileSystemFileHandle
+                try {
+                    h = await dir.getFileHandle(face)
+                }
+                catch (e) {
+                    if (e instanceof Error && e.name != 'NotFoundError')
+                        throw e
+                    return
+                }
+                const file = await h.getFile()
+                const canvas = await loadImage(file)
+                batch(() => {
+                    setImageCache(face, canvas)
+                    setBlobCache(face, file)
+                })
+            }))
+        })
         .catch(err => console.error(err))
         .finally(() => setState({ loading: false }))
     
-    const saveImage = (face: Faces, canvas: HTMLCanvasElement) => {
-        canvasToBlob(canvas).then(async (blob) => {
-            const dir = await navigator.storage.getDirectory()
+    const saveImage = (face: Faces, blob: Blob) => {
+        navigator.storage.getDirectory().then(async (dir) => {
             const handle = await dir.getFileHandle(face, { create: true })
             const writeable = await handle.createWritable()
             blob.stream().pipeTo(writeable)
@@ -258,12 +269,17 @@ export const App = () => {
     // Update previews
     createEffect(() => {
         if (config.view.preview == 'canvas') {
+            const detailsDiv = pageDetailsDiv()
+            const canvas = previewCanvas()
+
+            if (!detailsDiv || !canvas)
+                return
+
             // page dimensions
             const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
 
-            pageDetailsRef!.textContent = `${config.page} ${pageSize[0]}x${pageSize[1]}${config.units}`
+            detailsDiv.textContent = `${config.page} ${pageSize[0]}x${pageSize[1]}${config.units}`
 
-            const canvas = canvasRef!
             canvas.width = convert(pageSize[0], config.units, 'pt')
             canvas.height = convert(pageSize[1], config.units, 'pt')
 
@@ -273,8 +289,12 @@ export const App = () => {
             renderTuckBox(ctx)
         }
         else if (config.view.preview == 'pdf') {
-            const { blob, url } = generatePdfBlob()
-            previewFrameRef!.src = url
+            const frame = previewFrame()
+            if (!frame)
+                return
+
+            const { url } = generatePdfBlob()
+            frame.src = url
         }
     })
     
@@ -316,38 +336,40 @@ export const App = () => {
     
     const FaceComponent = (props: FaceComponentProps) => 
         <VStack alignItems='flex-start'>
-            <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => props.setValue({ text })} />
+            <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => setConfig('face', props.id, { text })}/>
             <HStack>
-                <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => props.setValue('font', { family })}>
+                <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => setConfig('face', props.id, 'font', { family })}>
                     <Select.Item value='Courier'>Courier</Select.Item>
                     <Select.Item value='Helvetica'>Helvetica</Select.Item>
                     <Select.Item value='Times-Roman'>Times Roman</Select.Item>
                 </Select>
-                <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => props.setValue('font', { size })} />
-                <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => props.setValue('font', { weight })} />
+                <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => setConfig('face', props.id, 'font', { size })} />
+                <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => setConfig('face', props.id, 'font', { weight })} />
             </HStack>
             <HStack>
-                <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => props.setValue('font', { color })} />
-                <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => props.setValue('font', { outlineWidth })} />
-                <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => props.setValue('font', { outlineColor })} />
+                <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => setConfig('face', props.id, 'font', { color })} />
+                <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => setConfig('face', props.id, 'font', { outlineWidth })} />
+                <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => setConfig('face', props.id, 'font', { outlineColor })} />
             </HStack>
-            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} value={imageCache[props.id]} onChange={result => batch(() => {
+            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} blob={blobCache[props.id]} cropData={config.face[props.id].crop} onChange={result => batch(() => {
                 if (result) {
                     setImageCache(props.id, result.canvas)
-                    saveImage(props.id, result.canvas)
-                    props.setValue('crop', { x: result.cropData.x, y: result.cropData.y, width: result.cropData.width, height: result.cropData.height })
+                    if (result.blob !== blobCache[props.id]) {
+                        setBlobCache(props.id, result.blob)
+                        saveImage(props.id, result.blob)
+                    }
+                    setConfig('face', props.id, 'crop', { x: result.cropData.x, y: result.cropData.y, width: result.cropData.width, height: result.cropData.height })
                 }
                 else {
                     setImageCache(props.id, undefined)
+                    setBlobCache(props.id, undefined)
                     deleteImage(props.id)
+                    setConfig('face', props.id, 'crop', defaultFace.crop)
                 }
             })} />
         </VStack>
 
-    return <>
-        <Modal open={state.loading}>
-            Loading...
-        </Modal>
+    return <Show when={!state.loading} fallback={'Loading...'}>
         <HStack spacing={8} width='100%' height='100%'>
             <VStack>
                 <h2>Page & Print</h2>
@@ -391,30 +413,30 @@ export const App = () => {
                 </HStack>
                 <Switch>
                     <Match when={config.view.face == 'front'}>
-                        <FaceComponent id='front' value={config.face.front} setValue={setConfig.bind(undefined, 'face', 'front')} />
+                        <FaceComponent id='front' value={config.face.front} />
                     </Match>
                     <Match when={config.view.face == 'back'}>
                         <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
                         <Show when={!config.face.back.sameAsFront}>
-                            <FaceComponent id='back' value={config.face.back} setValue={setConfig.bind(undefined, 'face', 'back')}/>
+                            <FaceComponent id='back' value={config.face.back} />
                         </Show>
                     </Match>
                     <Match when={config.view.face == 'top'}>
-                        <FaceComponent id='top' value={config.face.top} setValue={setConfig.bind(undefined, 'face', 'top')} />
+                        <FaceComponent id='top' value={config.face.top} />
                     </Match>
                     <Match when={config.view.face == 'bottom'}>
                         <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
                         <Show when={!config.face.bottom.sameAsTop}>
-                            <FaceComponent id='bottom' value={config.face.bottom} setValue={setConfig.bind(undefined, 'face', 'bottom')}/>
+                            <FaceComponent id='bottom' value={config.face.bottom} />
                         </Show>
                     </Match>
                     <Match when={config.view.face == 'left'}>
-                        <FaceComponent id='left' value={config.face.left} setValue={setConfig.bind(undefined, 'face', 'left')} />
+                        <FaceComponent id='left' value={config.face.left} />
                     </Match>
                     <Match when={config.view.face == 'right'}>
                         <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
                         <Show when={!config.face.right.sameAsLeft}>
-                            <FaceComponent id='right' value={config.face.right} setValue={setConfig.bind(undefined, 'face', 'right')}/>
+                            <FaceComponent id='right' value={config.face.right} />
                         </Show>
                     </Match>
                 </Switch>
@@ -439,14 +461,14 @@ export const App = () => {
                     </ToggleButton>
                 </HStack>
                 <Switch fallback={<>
-                    <canvas width="800" height="600" ref={canvasRef} style={{ border: '1px solid grey' }}></canvas>
+                    <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
                 </>}>
                     <Match when={config.view.preview == 'pdf'}>
-                        <iframe width="800" height="600" ref={previewFrameRef} style={{ border: 'none', width: '100%' }}></iframe>
+                        <iframe width="800" height="600" ref={setPreviewFrame} style={{ border: 'none', width: '100%' }}></iframe>
                     </Match>
                 </Switch>
-                <div ref={pageDetailsRef}></div>
+                <div ref={setPageDetailsDiv}></div>
             </VStack>
         </HStack>
-    </>
+    </Show>
 }

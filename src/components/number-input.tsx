@@ -1,15 +1,19 @@
 import { Component, createSignal } from 'solid-js'
 import { TextField, InputAdornment } from '@suid/material'
 
-interface NumberInputProps {
+type NumberInputProps = {
     id: string
     value: number
     disabled?: boolean
     integer?: boolean
     label: string
     units?: string
+} & ({
     onChange: (value: number) => void
-}
+} | {
+    disabled: true 
+    onChange?: (value: number) => void
+})
 
 const isNumeric = (text: string) => /^[0-9]*([.][0-9]*)?$/.test(text)
 
@@ -27,7 +31,7 @@ export const NumberInput: Component<NumberInputProps> = (props) => {
         const isValid = newValue !== '' && !Number.isNaN(newNumber)
 
         setValue(newValue)
-        if (isValid)
+        if (isValid && props.onChange)
             props.onChange(newNumber)
     }
 
