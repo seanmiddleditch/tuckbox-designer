@@ -407,89 +407,92 @@ export const App = () => {
         </VStack>
 
     return <Show when={!state.loading} fallback={'Loading...'}>
-        <HStack spacing={8} width='100%' height='100%'>
-            <VStack>
-                <HStack alignItems='center'>
-                    <h2>Page & Print</h2>
-                    <FormGroup>
-                        <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
-                    </FormGroup>
-                    <Button.Group>
-                        <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
-                    </Button.Group>
-                </HStack>
-                <HStack>
-                    <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
-                        <Select.Item value='letter'>US Letter</Select.Item>
-                        <Select.Item value='a4'>A4</Select.Item>
-                    </Select>
-                    <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
-                        <Select.Item value='cm'>centimeters</Select.Item>
-                        <Select.Item value='mm'>millimeters</Select.Item>
-                        <Select.Item value='in'>inches</Select.Item>
-                        <Select.Item value='pt'>points</Select.Item>
-                    </Select>
-                </HStack>
-                <Show when={config.view.advanced}>
-                    <HStack>
-                        <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
-                        <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
-                        <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
+        <VStack>
+            <HStack spacing={8} width='100%' height='100%'>
+                <VStack>
+                    <HStack alignItems='center'>
+                        <h2>Page & Print</h2>
+                        <FormGroup>
+                            <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
+                        </FormGroup>
+                        <Button.Group>
+                            <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
+                        </Button.Group>
                     </HStack>
-                </Show>
-                <h2>Deck Size</h2>
-                <HStack>
-                    <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                    <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                    <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
-                </HStack>
-                <h2>Styling</h2>
-                <VStack alignItems='flex-start'>
-                    <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
-                    <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
+                    <HStack>
+                        <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
+                            <Select.Item value='letter'>US Letter</Select.Item>
+                            <Select.Item value='a4'>A4</Select.Item>
+                        </Select>
+                        <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
+                            <Select.Item value='cm'>centimeters</Select.Item>
+                            <Select.Item value='mm'>millimeters</Select.Item>
+                            <Select.Item value='in'>inches</Select.Item>
+                            <Select.Item value='pt'>points</Select.Item>
+                        </Select>
+                    </HStack>
+                    <Show when={config.view.advanced}>
+                        <HStack>
+                            <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                            <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
+                            <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
+                        </HStack>
+                    </Show>
+                    <h2>Deck Size</h2>
+                    <HStack>
+                        <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                        <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                        <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                    </HStack>
+                    <h2>Styling</h2>
+                    <VStack alignItems='flex-start'>
+                        <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
+                        <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
+                    </VStack>
+                    <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
+                    <HStack alignItems='baseline'>
+                        <h2>Faces</h2>
+                        <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
+                            <Select.Item value='front'>Front</Select.Item>
+                            <Select.Item value='back'>Back</Select.Item>
+                            <Select.Item value='top'>Top</Select.Item>
+                            <Select.Item value='bottom'>Bottom</Select.Item>
+                            <Select.Item value='left'>Left</Select.Item>
+                            <Select.Item value='right'>Right</Select.Item>
+                        </Select>
+                    </HStack>
+                    <Switch>
+                        <For each={faces}>
+                            {face => <Match when={config.view.face == face}>
+                                <FaceComponent id={face} value={config.face[face]} />
+                            </Match>}
+                        </For>
+                    </Switch>
+                    <h2>Download</h2>
+                    <Button.Group>
+                        <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
+                        <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
+                    </Button.Group>
+                    <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
                 </VStack>
-                <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
-                <HStack alignItems='baseline'>
-                    <h2>Faces</h2>
-                    <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
-                        <Select.Item value='front'>Front</Select.Item>
-                        <Select.Item value='back'>Back</Select.Item>
-                        <Select.Item value='top'>Top</Select.Item>
-                        <Select.Item value='bottom'>Bottom</Select.Item>
-                        <Select.Item value='left'>Left</Select.Item>
-                        <Select.Item value='right'>Right</Select.Item>
-                    </Select>
-                </HStack>
-                <Switch>
-                    <For each={faces}>
-                        {face => <Match when={config.view.face == face}>
-                            <FaceComponent id={face} value={config.face[face]} />
-                        </Match>}
-                    </For>
-                </Switch>
-                <h2>Download</h2>
-                <Button.Group>
-                    <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
-                    <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
-                </Button.Group>
-                <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
-            </VStack>
-            <VStack width='100%' alignItems='flex-start'>
-                <HStack alignItems='center'>
-                    <h2>Preview</h2>
-                    <FormGroup>
-                        <FormControlLabel label='Live PDF' control={<Checkbox checked={config.view.preview == 'pdf'} onChange={(_, checked) => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />} />
-                    </FormGroup>
-                </HStack>
-                <Switch fallback={<>
-                    <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
-                </>}>
-                    <Match when={config.view.preview == 'pdf'}>
-                        <iframe width="800" height="600" ref={setPreviewFrame} style={{ border: 'none', width: '100%' }}></iframe>
-                    </Match>
-                </Switch>
-                <div ref={setPageDetailsDiv}></div>
-            </VStack>
-        </HStack>
+                <VStack width='100%' alignItems='flex-start'>
+                    <HStack alignItems='center'>
+                        <h2>Preview</h2>
+                        <FormGroup>
+                            <FormControlLabel label='Live PDF' control={<Checkbox checked={config.view.preview == 'pdf'} onChange={(_, checked) => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />} />
+                        </FormGroup>
+                    </HStack>
+                    <Switch fallback={<>
+                        <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
+                    </>}>
+                        <Match when={config.view.preview == 'pdf'}>
+                            <iframe width="800" height="600" ref={setPreviewFrame} style={{ border: 'none', width: '100%' }}></iframe>
+                        </Match>
+                    </Switch>
+                    <div ref={setPageDetailsDiv}></div>
+                </VStack>
+            </HStack>
+            <div>Tuckbox Designer by Sean Middleditch :: <a href="https://github.com/seanmiddleditch/tuckbox-designer">GitHub</a></div>
+        </VStack>
     </Show>
 }
