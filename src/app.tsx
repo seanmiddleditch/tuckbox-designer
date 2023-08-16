@@ -1,32 +1,34 @@
-import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal } from 'solid-js'
+import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal, For } from 'solid-js'
 import { createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
-import {  generate, getFaceDimensions } from './generate'
+import { FaceOptions, generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
 import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
-import { ToggleButton } from './components/toggle-button'
 import { ColorPicker } from './components/color-picker'
 import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
-import { ImageSelect } from './components/image-select'
+import { FontSelector } from './components/font-selector'
+import { ImageSelect, ImageSelectResult } from './components/image-select'
+import { Checkbox, FormControlLabel, FormGroup } from '@suid/material'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
-import { ToggleSwitch } from './components/toggle-switch'
-import { Checkbox, FormControlLabel, FormGroup } from '@suid/material'
 
 interface Config {
     units: Units
     page: PaperFormats
-    title: string
-    color: RGB
+    style: {
+        title: string
+        color: RGB
+        font: Font
+    }
     view: {
         advanced: boolean
         preview: 'canvas' | 'pdf',
@@ -34,11 +36,11 @@ interface Config {
     }
     face: {
         front: Face
-        back: Face & { sameAsFront: boolean }
+        back: Face
         top: Face
-        bottom: Face & { sameAsTop: boolean }
+        bottom: Face
         left: Face
-        right: Face & { sameAsLeft: boolean }
+        right: Face
     }
     size: Size
     bleed: number
@@ -67,26 +69,31 @@ const defaultFont: Font = {
 const defaultFace: Face = {
     text: '',
     font: defaultFont,
+    useTitle: true,
+    useDefaultFont: true,
     crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 }
 }
 
 const defualtConfig: Config = {
     units: 'in',
     page: 'letter',
-    title: 'Sample',
-    color: { r: 255, g: 255, b: 255 },
+    style: {
+        title: 'Sample',
+        color: { r: 255, g: 255, b: 255 },
+        font: defaultFont,
+    },
     view: {
         advanced: false,
         preview: 'canvas',
         face: 'front',
     },
     face: {
-        front: { ...defaultFace, text: 'Sample' },
-        back: { sameAsFront: true, ...defaultFace },
-        top: { ...defaultFace },
-        bottom: { sameAsTop: true, ...defaultFace },
-        left: { ...defaultFace },
-        right: { sameAsLeft: true, ...defaultFace },
+        front: { ...defaultFace, text: 'Front' },
+        back: { ...defaultFace, text: 'Back' },
+        top: { ...defaultFace, text: 'Top' },
+        bottom: { ...defaultFace, text: 'Bottom' },
+        left: { ...defaultFace, text: 'Left' },
+        right: { ...defaultFace, text: 'Right' },
     },
     size: {
         width: 2.25,
@@ -101,6 +108,8 @@ const defualtConfig: Config = {
 interface FaceComponentProps {
     id: Faces
     value: Face
+    sameImageField?: string
+    sameImageLabel?: string
 }
 
 interface AppState {
@@ -129,6 +138,7 @@ const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RG
                         imageSmoothingEnabled: true,
                         imageSmoothingQuality: 'high'
                     })
+                    cropper.destroy()
                     document.body.removeChild(img)
                     resolve(canvas)
                 }
@@ -219,7 +229,7 @@ export const App = () => {
                 // we need to read the properties themselves to be reactive
                 const { x, y, width, height, scaleX, scaleY, rotate } = config.face[face].crop
 
-                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), config.color).then(canvas => setImageCache(face, canvas))
+                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), config.style.color).then(canvas => setImageCache(face, canvas))
             } else {
                 setImageCache(face, undefined)
             }
@@ -251,33 +261,29 @@ export const App = () => {
             depth: toPt(config.size.depth)
         }
 
-        const front = { ...config.face.front, image: imageCache.front }
-        const back = config.face.back.sameAsFront ? front : {
-            ...config.face.back, image: imageCache.back
-        }
-        const top = { ...config.face.top, image: imageCache.top }
-        const bottom = config.face.bottom.sameAsTop ? top : {
-            ...config.face.bottom, image: imageCache.bottom
-        }
-        const left = { ...config.face.left, image: imageCache.left }
-        const right = config.face.right.sameAsLeft ? left : {
-            ...config.face.right, image: imageCache.right
+        const getFace = (face: Faces): FaceOptions => ({
+            ...config.face[face],
+            text: config.face[face].useTitle ? config.style.title : config.face[face].text,
+            font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
+            image: imageCache[face]
+        })
+
+        const face = {
+            front: getFace('front'),
+            back: getFace('back'),
+            top: getFace('top'),
+            bottom: getFace('bottom'),
+            left: getFace('left'),
+            right: getFace('right'),
         }
 
         generate(ctx, {
             size,
-            color: config.color,
+            color: config.style.color,
             bleed: toPt(config.bleed),
             thickness: toPt(config.thickness),
             margin: toPt(config.margin),
-            face: {
-                front,
-                back,
-                top,
-                bottom,
-                left,
-                right,
-            }
+            face
         })
     }
         
@@ -346,7 +352,7 @@ export const App = () => {
     const savePdf = () => {
         const { blob, url } = generatePdfBlob()
 
-        let name = config.title.toLowerCase().replace(/[^a-z0-9]+/, '-')
+        let name = config.style.title.toLowerCase().replace(/[^a-z0-9]+/, '-')
         if (name === '')
             name += '-'
         name += 'tuckbox.pdf'
@@ -361,46 +367,43 @@ export const App = () => {
 
         window.open(url, 'pdf')
     }
+
+    const setFaceImage = (face: Faces, result: ImageSelectResult) => {
+        batch(() => {
+            if (result) {
+                if (result.blob !== blobCache[face]) {
+                    setBlobCache(face, result.blob)
+                    saveImage(face, result.blob)
+                }
+                setConfig('face', face, 'crop', {
+                    x: result.cropData.x,
+                    y: result.cropData.y,
+                    width: result.cropData.width,
+                    height: result.cropData.height,
+                    rotate: result.cropData.rotate,
+                    scaleX: result.cropData.scaleX,
+                    scaleY: result.cropData.scaleY,
+                })
+            }
+            else {
+                setBlobCache(face, undefined)
+                deleteImage(face)
+                setConfig('face', face, 'crop', defaultFace.crop)
+            }
+        })
+    }
     
     const FaceComponent = (props: FaceComponentProps) => 
         <VStack alignItems='flex-start'>
-            <TextInput id={`${props.id}-text`} label='Label' sx={{ width: '100%' }} value={props.value.text} onChange={text => setConfig('face', props.id, { text })}/>
             <HStack>
-                <Select id={`${props.id}-font-family`} label='Font Family' width='14em' disabled={props.value.text == ''} value={props.value.font.family} onChange={family => setConfig('face', props.id, 'font', { family })}>
-                    <Select.Item value='Courier'>Courier</Select.Item>
-                    <Select.Item value='Helvetica'>Helvetica</Select.Item>
-                    <Select.Item value='Times-Roman'>Times Roman</Select.Item>
-                </Select>
-                <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.value.text == ''} value={props.value.font.size} onChange={size => setConfig('face', props.id, 'font', { size })} />
-                <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.value.text == ''} value={props.value.font.weight} onChange={weight => setConfig('face', props.id, 'font', { weight })} />
+                <Checkbox checked={!props.value.useTitle} onChange={(_, checked) => setConfig('face', props.id, { useTitle: !checked })} />
+                <TextInput id={`${props.id}-text`} label='Label' disabled={!!props.value.useTitle} sx={{ width: '100%' }} value={props.value.text} onChange={text => setConfig('face', props.id, { text })} />
             </HStack>
             <HStack>
-                <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.value.text == ''} color={props.value.font.color} onChange={color => setConfig('face', props.id, 'font', { color })} />
-                <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.value.text == ''} value={props.value.font.outlineWidth} onChange={outlineWidth => setConfig('face', props.id, 'font', { outlineWidth })} />
-                <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.value.text == ''} color={props.value.font.outlineColor} onChange={outlineColor => setConfig('face', props.id, 'font', { outlineColor })} />
+                <Checkbox checked={!props.value.useDefaultFont} onChange={(_, checked) => setConfig('face', props.id, { useDefaultFont: !checked })} />
+                <FontSelector id={`${props.id}-font`} label='Font' disabled={props.value.useDefaultFont} value={props.value.font} onChange={font => setConfig('face', props.id, 'font', font)} />
             </HStack>
-            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} blob={blobCache[props.id]} cropData={config.face[props.id].crop} onChange={result => batch(() => {
-                if (result) {
-                    if (result.blob !== blobCache[props.id]) {
-                        setBlobCache(props.id, result.blob)
-                        saveImage(props.id, result.blob)
-                    }
-                    setConfig('face', props.id, 'crop', {
-                        x: result.cropData.x,
-                        y: result.cropData.y,
-                        width: result.cropData.width,
-                        height: result.cropData.height,
-                        rotate: result.cropData.rotate,
-                        scaleX: result.cropData.scaleX,
-                        scaleY: result.cropData.scaleY,
-                    })
-                }
-                else {
-                    setBlobCache(props.id, undefined)
-                    deleteImage(props.id)
-                    setConfig('face', props.id, 'crop', defaultFace.crop)
-                }
-            })} />
+            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} blob={blobCache[props.id]} cropData={config.face[props.id].crop} onChange={result => setFaceImage(props.id, result)}/>
         </VStack>
 
     return <Show when={!state.loading} fallback={'Loading...'}>
@@ -411,6 +414,9 @@ export const App = () => {
                     <FormGroup>
                         <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
                     </FormGroup>
+                    <Button.Group>
+                        <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
+                    </Button.Group>
                 </HStack>
                 <HStack>
                     <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
@@ -431,16 +437,18 @@ export const App = () => {
                         <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
                     </HStack>
                 </Show>
-                <h2>Deck Setup</h2>
+                <h2>Deck Size</h2>
+                <HStack>
+                    <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                    <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                    <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                </HStack>
+                <h2>Styling</h2>
                 <VStack alignItems='flex-start'>
-                    <HStack>
-                        <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                        <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                        <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
-                    </HStack>
-                    <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.title} onChange={value => setConfig('title', value)} />
-                    <ColorPicker id='box-color' label='Box Color' color={config.color} onChange={value => setConfig('color', value)}/>
+                    <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
+                    <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
                 </VStack>
+                <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
                 <HStack alignItems='baseline'>
                     <h2>Faces</h2>
                     <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
@@ -453,44 +461,17 @@ export const App = () => {
                     </Select>
                 </HStack>
                 <Switch>
-                    <Match when={config.view.face == 'front'}>
-                        <FaceComponent id='front' value={config.face.front} />
-                    </Match>
-                    <Match when={config.view.face == 'back'}>
-                        <ToggleSwitch label='Same as Front' value={config.face.back.sameAsFront} onChange={value => setConfig('face', 'back', 'sameAsFront', value)} />
-                        <Show when={!config.face.back.sameAsFront}>
-                            <FaceComponent id='back' value={config.face.back} />
-                        </Show>
-                    </Match>
-                    <Match when={config.view.face == 'top'}>
-                        <FaceComponent id='top' value={config.face.top} />
-                    </Match>
-                    <Match when={config.view.face == 'bottom'}>
-                        <ToggleSwitch label='Same as Top' value={config.face.bottom.sameAsTop} onChange={value => setConfig('face', 'bottom', 'sameAsTop', value)} />
-                        <Show when={!config.face.bottom.sameAsTop}>
-                            <FaceComponent id='bottom' value={config.face.bottom} />
-                        </Show>
-                    </Match>
-                    <Match when={config.view.face == 'left'}>
-                        <FaceComponent id='left' value={config.face.left} />
-                    </Match>
-                    <Match when={config.view.face == 'right'}>
-                        <ToggleSwitch label='Same as Left' value={config.face.right.sameAsLeft} onChange={value => setConfig('face', 'right', 'sameAsLeft', value)} />
-                        <Show when={!config.face.right.sameAsLeft}>
-                            <FaceComponent id='right' value={config.face.right} />
-                        </Show>
-                    </Match>
+                    <For each={faces}>
+                        {face => <Match when={config.view.face == face}>
+                            <FaceComponent id={face} value={config.face[face]} />
+                        </Match>}
+                    </For>
                 </Switch>
                 <h2>Download</h2>
-                <VStack>
-                    <Button.Group>
-                        <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
-                        <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
-                    </Button.Group>
-                    <Button.Group>
-                        <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
-                    </Button.Group>
-                </VStack>
+                <Button.Group>
+                    <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
+                    <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
+                </Button.Group>
                 <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
             </VStack>
             <VStack width='100%' alignItems='flex-start'>

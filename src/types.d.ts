@@ -6,8 +6,10 @@ export interface RGB {
     b: number
 }
 
+export type FontFamily = 'Courier' | 'Helvetica' | 'Times-Roman'
+
 export interface Font {
-    family: string
+    family: FontFamily
     size: number
     weight: number
     color: RGB
@@ -35,6 +37,8 @@ export interface CropData {
 
 export interface Face {
     text: string
+    useTitle?: boolean
     font: Font
+    useDefaultFont?: boolean
     crop: CropData
 }

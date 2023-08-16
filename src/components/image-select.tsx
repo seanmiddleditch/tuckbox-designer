@@ -9,6 +9,8 @@ import { createStore, unwrap } from 'solid-js/store'
 import { Rotate90DegreesCwRounded, Rotate90DegreesCcwRounded, SwapHorizRounded, SwapVertRounded, UploadFileRounded, ClearRounded, CheckRounded } from '@suid/icons-material'
 import { CropData } from '../types'
 
+export type ImageSelectResult = { canvas: HTMLCanvasElement, blob: Blob, cropData: Cropper.Data } | undefined
+
 interface ImageSelectProps {
     id: string
     dimensions: [number, number]
@@ -16,7 +18,7 @@ interface ImageSelectProps {
     blob?: Blob
     cropData?: CropData
     accept?: string
-    onChange: (value?: { canvas: HTMLCanvasElement, blob: Blob, cropData: Cropper.Data }) => void
+    onChange: (value: ImageSelectResult) => void
 }
 
 interface ImageSelectStore {

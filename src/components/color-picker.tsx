@@ -1,5 +1,5 @@
-import { Button, Modal, Box, TextField, InputAdornment, FormControl, OutlinedInput, FormControlLabel, InputLabel } from '@suid/material'
-import { Component } from 'solid-js'
+import { Button, InputAdornment, FormControl, OutlinedInput, Popover, InputLabel } from '@suid/material'
+import { Component, batch } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { ChromePicker } from 'solid-color'
 import { RGB } from '../types'
@@ -10,12 +10,14 @@ interface ColorButtonsProps {
     onClick: (e: any) => void
 }
 
-const colorToString = (rgb: RGB) => `rgb(${rgb.r}, ${rgb.g}, ${rgb.b})`
+const toHex = (n: number, p: number = 2) => `00${n.toString(16)}`.slice(-2)
 
-const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} disabled={props.disabled} style={{ padding: 0, 'min-width': 0 }}>
+const colorToString = (rgb: RGB) => `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`
+
+const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} disabled={props.disabled} style={{ padding: 0, 'min-width': '0' }}>
     <div style={{
-        'width': '1.5em',
-        'height': '1.5em',
+        'width': '2ch',
+        'height': '2ch',
         'background-image': 'repeating-linear-gradient(45deg,#aaa 25%,transparent 25%,transparent 75%,#aaa 75%,#aaa),repeating-linear-gradient(45deg,#aaa 25%,#fff 25%,#fff 75%,#aaa 75%,#aaa)',
         'background-position': '0 0, 4px 4px',
         'background-size': '8px 8px',
@@ -48,33 +50,29 @@ interface ColorPickerProps {
 
 export const ColorPicker: Component<ColorPickerProps> = props => {
     const [isColorOpen, setColorOpen] = createSignal(false)
+    const [anchor, setAnchor] = createSignal<HTMLElement|null>(null)
 
     const button = () => <InputAdornment position='end'><ColorButton color={props.color} disabled={props.disabled} onClick={() => setColorOpen(true)} /></InputAdornment>
 
     const onClick = (e: MouseEvent) => {
         const input = e.target as HTMLInputElement
+        setAnchor(input)
         if (input.selectionStart == input.selectionEnd)
             setColorOpen(true)
     }
 
+    const onClose = () => batch(() => {
+        setColorOpen(false)
+        setAnchor(null)
+    })
+
     return <>
-        <FormControl size='small' variant='outlined'>
+        <FormControl size='small' variant='outlined' style='width: 17ch'>
             <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
             <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={colorToString(props.color)} endAdornment={button()} />
         </FormControl>
-        <Modal open={isColorOpen()} onClose={() => setColorOpen(false)}>
-            <Box sx={{
-                position: "absolute",
-                top: "50%",
-                left: "50%",
-                transform: "translate(-50%, -50%)",
-                bgcolor: 'background.paper',
-                border: "2px solid #000",
-                boxShadow: "24px",
-                p: 4,
-            }}>
-                <ChromePicker color={props.color} disableAlpha onChange={color => props.onChange(color.rgb) } />
-            </Box>
-        </Modal>
+        <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={isColorOpen()} onClose={onClose}>
+            <ChromePicker color={props.color} disableAlpha onChange={color => props.onChange(color.rgb) } />
+        </Popover>
     </>
 }
