@@ -3,16 +3,13 @@ import { Component, batch } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { ChromePicker } from 'solid-color'
 import { RGB } from '../types'
+import { colorToString } from '../color'
 
 interface ColorButtonsProps {
     color: RGB,
     disabled?: boolean
     onClick: (e: any) => void
 }
-
-const toHex = (n: number, p: number = 2) => `00${n.toString(16)}`.slice(-2)
-
-const colorToString = (rgb: RGB) => `#${toHex(rgb.r)}${toHex(rgb.g)}${toHex(rgb.b)}`
 
 const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={props.onClick} disabled={props.disabled} style={{ padding: 0, 'min-width': '0' }}>
     <div style={{

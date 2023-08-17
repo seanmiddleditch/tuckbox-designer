@@ -446,7 +446,7 @@ export const App = () => {
                     </HStack>
                     <h2>Styling</h2>
                     <VStack alignItems='flex-start'>
-                        <TextInput id='title' label='Deck Title' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
+                        <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
                         <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
                     </VStack>
                     <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />

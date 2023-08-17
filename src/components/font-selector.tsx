@@ -1,10 +1,11 @@
-import { Box, FormControl, InputLabel, OutlinedInput, Popover } from '@suid/material'
-import { Font } from '../types'
+import { Box, Button, FormControl, InputAdornment, InputLabel, OutlinedInput, Popover } from '@suid/material'
+import { Font, RGB } from '../types'
 import { ColorPicker } from './color-picker'
 import { NumberInput } from './number-input'
 import { Select } from './select'
 import { HStack, VStack } from './stack'
-import { createSignal } from 'solid-js'
+import { Component, createSignal } from 'solid-js'
+import { colorToString } from '../color'
 
 interface FontSelectorProps {
     id: string
@@ -14,19 +15,53 @@ interface FontSelectorProps {
     onChange: (font: Partial<Font>) => void
 }
 
+interface FontColorProps {
+    disabled?: boolean
+    color: RGB
+    outlineColor: RGB
+    outlineWidth: number
+}
+
+const FontColor: Component<FontColorProps> = props =>
+    <div style={{
+        'width': '2ch',
+        'height': '2ch',
+        'background-color': '#fff',
+        'border': '2px solid #fff',
+        'box-shadow': '0 0 0 1px #ccc',
+        'border-radius': '8px',
+        'overflow': 'hidden'
+    }}>
+        <div style={{
+            'box-sizing': 'border-box',
+            'width': '100%',
+            'height': '100%',
+            'background-color': colorToString(props.color),
+            'background-position': '0 0, 3px 3px',
+            'background-size': '8px 8px',
+            'border-style': 'solid',
+            'border-color': colorToString(props.outlineColor),
+            'border-width': `${props.outlineWidth}px`,
+            'border-radius': 'inherit',
+        }}></div>
+    </div>
+
 export const FontSelector = (props: FontSelectorProps) => {
-    const [anchor, setAnchor] = createSignal<HTMLElement|null>(null)
+    const [anchor, setAnchor] = createSignal<HTMLElement | null>(null)
+    const [isOpen, setIsOpen] = createSignal<boolean>(false)
 
-    const onClick = (e: MouseEvent) => setAnchor(e.target as HTMLInputElement)
+    const button = () => <InputAdornment position='end'><FontColor color={props.value.color} outlineColor={props.value.outlineColor} outlineWidth={props.value.outlineWidth} disabled={props.disabled} /></InputAdornment>
 
-    const onClose = () => setAnchor(null)
+    const onClick = () => { if (!props.disabled) setIsOpen(true) }
 
+    const onClose = () => setIsOpen(false)
+    
     return <>
-        <FormControl size='small' variant='outlined'>
+        <FormControl ref={setAnchor} size='small' variant='outlined'>
             <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
-            <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={`${props.value.size}pt ${props.value.family} ${props.value.weight}`} />
+            <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={`${props.value.size}pt ${props.value.family} ${props.value.weight}`} endAdornment={button()} />
         </FormControl>
-        <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={anchor() != null} onClose={onClose}>
+        <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={isOpen()} onClose={onClose}>
             <Box sx={{ border: 1, p: 3, bgcolor: 'background.paper' }}>
                 <VStack>
                     <HStack>
