@@ -40,5 +40,6 @@ export interface Face {
     useTitle?: boolean
     font: Font
     useDefaultFont?: boolean
+    useOppositeImage?: boolean
     crop: CropData
 }

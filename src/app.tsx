@@ -1,5 +1,5 @@
 import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal, For } from 'solid-js'
-import { createStore } from 'solid-js/store'
+import { createStore, unwrap } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
 import { FaceOptions, generate, getFaceDimensions } from './generate'
@@ -13,7 +13,7 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
-import { Checkbox, FormControlLabel, FormGroup } from '@suid/material'
+import { Checkbox, FormControlLabel, FormGroup, Typography } from '@suid/material'
 import { Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData } from './types'
 import Cropper from 'cropperjs'
@@ -89,11 +89,11 @@ const defualtConfig: Config = {
     },
     face: {
         front: { ...defaultFace, text: 'Front' },
-        back: { ...defaultFace, text: 'Back' },
+        back: { ...defaultFace, text: 'Back', useOppositeImage: true },
         top: { ...defaultFace, text: 'Top' },
-        bottom: { ...defaultFace, text: 'Bottom' },
+        bottom: { ...defaultFace, text: 'Bottom', useOppositeImage: true },
         left: { ...defaultFace, text: 'Left' },
-        right: { ...defaultFace, text: 'Right' },
+        right: { ...defaultFace, text: 'Right', useOppositeImage: true },
     },
     size: {
         width: 2.25,
@@ -105,18 +105,13 @@ const defualtConfig: Config = {
     thickness: 0.02
 }
 
-interface FaceComponentProps {
-    id: Faces
-    value: Face
-    sameImageField?: string
-    sameImageLabel?: string
-}
-
 interface AppState {
     loading: boolean
 }
 
 const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
+
+const canUseOppositeImage = (face: Faces) => face == 'back' || face == 'bottom' || face == 'right'
 
 const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RGB): Promise<HTMLCanvasElement> => {
     const img = new Image()
@@ -277,6 +272,13 @@ export const App = () => {
             right: getFace('right'),
         }
 
+        if (config.face.back.useOppositeImage)
+            face.back.image = face.front.image
+        if (config.face.bottom.useOppositeImage)
+            face.bottom.image = face.top.image
+        if (config.face.right.useOppositeImage)
+            face.right.image = face.left.image
+
         generate(ctx, {
             size,
             color: config.style.color,
@@ -392,19 +394,6 @@ export const App = () => {
             }
         })
     }
-    
-    const FaceComponent = (props: FaceComponentProps) => 
-        <VStack alignItems='flex-start'>
-            <HStack>
-                <Checkbox checked={!props.value.useTitle} onChange={(_, checked) => setConfig('face', props.id, { useTitle: !checked })} />
-                <TextInput id={`${props.id}-text`} label='Label' disabled={!!props.value.useTitle} sx={{ width: '100%' }} value={props.value.text} onChange={text => setConfig('face', props.id, { text })} />
-            </HStack>
-            <HStack>
-                <Checkbox checked={!props.value.useDefaultFont} onChange={(_, checked) => setConfig('face', props.id, { useDefaultFont: !checked })} />
-                <FontSelector id={`${props.id}-font`} label='Font' disabled={props.value.useDefaultFont} value={props.value.font} onChange={font => setConfig('face', props.id, 'font', font)} />
-            </HStack>
-            <ImageSelect id={`${props.id}-image`} label='Image' dimensions={getFaceDimensionsPixels(props.id)} blob={blobCache[props.id]} cropData={config.face[props.id].crop} onChange={result => setFaceImage(props.id, result)}/>
-        </VStack>
 
     return <Show when={!state.loading} fallback={'Loading...'}>
         <VStack>
@@ -464,7 +453,19 @@ export const App = () => {
                     <Switch>
                         <For each={faces}>
                             {face => <Match when={config.view.face == face}>
-                                <FaceComponent id={face} value={config.face[face]} />
+                                <>
+                                    <HStack alignItems='center'>
+                                        <Typography variant='button'>Use...</Typography>
+                                        <FormControlLabel label='Label' control={<Checkbox checked={!config.face[face].useTitle} onChange={(_, checked) => setConfig('face', face, { useTitle: !checked })} />} />
+                                        <FormControlLabel label='Font' control={<Checkbox checked={!config.face[face].useDefaultFont} onChange={(_, checked) => setConfig('face', face, { useDefaultFont: !checked })} />} />
+                                        <FormControlLabel label='Image' control={<Checkbox disabled={!canUseOppositeImage(face)} checked={!config.face[face].useOppositeImage} onChange={(_, checked) => setConfig('face', face, { useOppositeImage: !checked })} />} />
+                                    </HStack>
+                                    <TextInput id={`face-${face}-text`} label='Label' disabled={!!config.face[face].useTitle} sx={{ width: '100%' }} value={config.face[face].text} onChange={text => setConfig('face', face, { text })} />
+                                    <HStack>
+                                        <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
+                                        <ImageSelect id={`face-${face}-image`} disabled={canUseOppositeImage(face) && config.face[face].useOppositeImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
+                                    </HStack>
+                                </>
                             </Match>}
                         </For>
                     </Switch>

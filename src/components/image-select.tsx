@@ -8,12 +8,14 @@ import { NumberInput } from './number-input'
 import { createStore, unwrap } from 'solid-js/store'
 import { Rotate90DegreesCwRounded, Rotate90DegreesCcwRounded, SwapHorizRounded, SwapVertRounded, UploadFileRounded, ClearRounded, CheckRounded } from '@suid/icons-material'
 import { CropData } from '../types'
+import { preview } from 'vite'
 
 export type ImageSelectResult = { canvas: HTMLCanvasElement, blob: Blob, cropData: Cropper.Data } | undefined
 
 interface ImageSelectProps {
     id: string
     dimensions: [number, number]
+    disabled?: boolean
     label: string
     blob?: Blob
     cropData?: CropData
@@ -32,9 +34,9 @@ interface ImageSelectStore {
 
 export const ImageSelect: Component<ImageSelectProps> = props => {
     const [store, setStore] = createStore<ImageSelectStore>({ open: false })
+    const [previewImage, setPreviewImage] = createSignal<HTMLImageElement|undefined>(undefined)
 
-    var fileRef: HTMLInputElement | undefined = undefined
-    var previewImageRef: HTMLImageElement | undefined = undefined
+    let fileRef: HTMLInputElement | undefined = undefined
     
     const aspectRatio = props.dimensions[1] != 0 ? props.dimensions[0] / props.dimensions[1] : 4 / 3
 
@@ -93,17 +95,18 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
         })
     }
     createEffect(() => {
-        if (!previewImageRef)
+        const img = previewImage()
+        if (!img)
             return
 
         if (!props.blob) {
-            previewImageRef.src = ''
+            img.src = ''
             return
         }
 
         const url = URL.createObjectURL(props.blob)
-        previewImageRef.onload = () => URL.revokeObjectURL(url)
-        previewImageRef.src = url
+        img.onload = () => URL.revokeObjectURL(url)
+        img.src = url
     })
 
     const closeModal = () => {
@@ -153,12 +156,12 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
     }
 
     return <>
-        <input ref={fileRef} type='file' style='display: none' onChange={e => onSelectFile(e.target.files)} accept={props.accept ?? 'image/*'} />
+        <input ref={fileRef} type='file' style='display: none' disabled={props.disabled} onChange={e => onSelectFile(e.target.files)} accept={props.accept ?? 'image/*'} />
         <ButtonGroup>
-            <Button size='small' variant='outlined' onClick={onPreviewButtonClick}>
+            <Button size='small' variant='outlined' disabled={props.disabled} onClick={onPreviewButtonClick}>
                 <Show when={props.blob} fallback={props.label ?? 'Image'}>
-                    <div style='max-width: 64px; height: 64px; overflow: hidden; display: flex; justify-content: center'>
-                        <img ref={previewImageRef} height="64" />
+                    <div style='width: 2.5em; height: 2.5em; overflow: hidden; display: flex; justify-content: center'>
+                        <img ref={setPreviewImage} style={ (previewImage()?.naturalWidth ?? 0) > (previewImage()?.naturalHeight ?? 0) ? 'width: 100%' : 'height: 100%' } />
                     </div>
                 </Show>
             </Button>
