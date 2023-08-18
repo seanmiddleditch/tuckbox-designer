@@ -271,20 +271,18 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // top
         if (options.face.top.text && options.face.top.font)
             writeCenterAngle(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, Math.PI, back.width * 0.9)
-            //writeLine(options.face.top.text, options.face.top.font, front.x + front.width * 0.5, front.y - size.depth * 0.5, front.width * 0.9)
 
         // bottom
         if (options.face.bottom.text && options.face.bottom.font)
             writeLine(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y  + front.height + size.depth * 0.5, front.width * 0.9)
-            //writeCenterAngle(options.face.bottom.text, options.face.bottom.font, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, back.width * 0.9)
 
         // left
         if (options.face.left.text && options.face.left.font)
-            writeCenterAngle(options.face.left.text, options.face.left.font, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 1.5, front.height * 0.9)
+            writeCenterAngle(options.face.left.text, options.face.left.font, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height * 0.9)
 
         // right
         if (options.face.right.text && options.face.right.font)
-            writeCenterAngle(options.face.right.text, options.face.right.font, front.x + front.width + size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height * 0.9)
+            writeCenterAngle(options.face.right.text, options.face.right.font, front.x + front.width + size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 1.5, front.height * 0.9)
     }
 
     const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLCanvasElement, r: number = 0) => {
@@ -384,10 +382,10 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             drawImage(front.x, front.y + front.height, front.width, size.depth, options.face.bottom.image)
 
         if (options.face.left.image)
-            drawImage(front.x - size.depth, front.y + front.height, front.height, size.depth, options.face.left.image, Math.PI * 1.5)
-
+            drawImage(front.x, front.y, front.height, size.depth, options.face.left.image, Math.PI * 0.5)
+        
         if (options.face.right.image)
-            drawImage(back.x, back.y, back.height, size.depth, options.face.right.image, Math.PI * 0.5)
+            drawImage(back.x - size.depth, back.y + back.height, back.height, size.depth, options.face.right.image, Math.PI * 1.5)
     }
     ctx.restore()
 
