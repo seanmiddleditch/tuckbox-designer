@@ -9,6 +9,7 @@ export interface FaceOptions {
 
 export interface GenerateOptions {
     size: Size
+    pageSize: [number, number]
     color: RGB
     bleed: number
     thickness: number
@@ -81,6 +82,22 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     const bgLuminosity = luminosity(options.color)
     const cutColor = bgLuminosity < .7 ? '#fff' : '#000'
     const scoreColor = bgLuminosity < .7 ? '#eee' : '#111'
+    const innerColor = '#aaa'
+
+    const instructFont: Font = {
+        family: 'Times-Roman',
+        size: 10,
+        weight: 400,
+        color: { r: 0, g: 0, b: 0 },
+        outlineColor: { r: 255, g: 255, b: 255 },
+        outlineWidth: 0,
+    }
+
+    let instructions = 'Cut along solid lines. Lightly score along dotted lines.\n'
+    instructions += 'Fold loosely into shape and check alignment.\n'
+    instructions += 'Glue inner side (A). Firmly press together with matching side and hold.\n'
+    if (options.style != 'double-tuck')
+        instructions += 'Glue inner side (B). Firmly press together with matching bottom and hold.'
 
     const pathOutline = () => {
         // top
@@ -208,30 +225,34 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     const wrapText = (text: string, w: number, lineHeight: number, cb: (t: string, y: number) => void) => {
-        var words = text.split(/\s+/)
-        var line = ''
-        var first = true
         var yOffset = 0
+        for (const textLine of text.split('\n')) {
+            const words = textLine.split(/\s+/)
+            let line = ''
+            let first = true
 
-        for (const word of words) {
-            const attempt = line + word + ' '
-            const m: any = ctx.measureText(attempt)
-            
-            if (m.width > w && !first) {
+            for (const word of words) {
+                const attempt = line + word + ' '
+                const m: any = ctx.measureText(attempt)
+                
+                if (m.width > w && !first) {
+                    cb(line, yOffset)
+
+                    line = word + ' '
+                    yOffset += lineHeight
+                }
+                else {
+                    line = attempt
+                }
+
+                first = false
+            }
+
+            if (line !== '')
                 cb(line, yOffset)
 
-                line = word + ' '
-                yOffset += lineHeight
-            }
-            else {
-                line = attempt
-            }
-
-            first = false
+            yOffset += lineHeight
         }
-
-        if (line !== '')
-            cb(line, yOffset)
     }
 
     const findLineHeight = () => {
@@ -239,7 +260,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         if ('fontBoundingBoxAscent' in (m as object) && 'fontBoundingBoxDescent' in (m as object))
             return m.fontBoundingBoxAscent + m.fontBoundingBoxDescent
         else
-            return m.width // hack
+            return m.width * 1.05 // hack
     }
 
     const drawLine = (x: number, y: number, text: string) => {
@@ -387,6 +408,23 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
     ctx.restore()
 
+    // glue region
+    ctx.save()
+    {
+        ctx.beginPath()
+        ctx.fillStyle = innerColor
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+
+        ctx.fillRect(back.x + back.width + options.bleed, back.y + options.bleed, size.depth * 0.8 - options.bleed * 2, back.height - options.bleed * 2)
+        writeCenterAngle('Glue Here (A)', instructFont, back.x + back.width + size.depth * 0.4, back.y + back.height * 0.5, Math.PI * 0.5, back.height - options.bleed * 2)
+
+        if (options.style != 'double-tuck') {
+            ctx.fillRect(back.x + options.bleed, back.y + back.height + options.bleed, back.width - options.bleed * 2, size.depth * 0.8 - options.bleed * 2)
+            writeCenterAngle('Glue Here (B)', instructFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.4, Math.PI, back.width - options.bleed * 2)
+        }
+    }
+
     // images
     ctx.save()
     {
@@ -424,6 +462,16 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.textBaseline = 'middle'
 
         drawText()
+    }
+    ctx.restore()
+
+    // instructions
+    ctx.save()
+    {
+        ctx.beginPath()
+        ctx.textAlign = 'left'
+        
+        writeLine(instructions, instructFont, back.x, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
     }
     ctx.restore()
 

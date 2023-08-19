@@ -11,7 +11,7 @@ const SIZE_IN_POINTS: Def = {
     'a4': [210, 297, 'mm'],
 }
 
-export function paperSize({ format = 'letter', units = 'pt', orientation = 'portrait' }: { format: PaperFormats, units: Units, orientation: Orientation }) {
+export function paperSize({ format = 'letter', units = 'pt', orientation = 'portrait' }: { format: PaperFormats, units: Units, orientation: Orientation }): [number, number] {
     if (!(format in SIZE_IN_POINTS)) throw `Unknown paper format: ${format}`
     if (orientation != 'portrait' && orientation != 'landscape') throw `Unknown orientation: ${orientation}`
 

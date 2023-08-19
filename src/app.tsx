@@ -294,6 +294,7 @@ export const App = () => {
 
         generate(ctx, {
             size,
+            pageSize: paperSize({ 'format': config.page, 'units': 'pt', 'orientation': 'landscape' }),
             style: config.style.style,
             color: config.style.color,
             bleed: toPt(config.bleed),
