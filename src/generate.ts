@@ -82,7 +82,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     const bgLuminosity = luminosity(options.color)
     const cutColor = bgLuminosity < .7 ? '#fff' : '#000'
     const scoreColor = bgLuminosity < .7 ? '#eee' : '#111'
-    const innerColor = '#aaa'
+    const innerColor = '#ccc'
 
     const instructFont: Font = {
         family: 'Times-Roman',

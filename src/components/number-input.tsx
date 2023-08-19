@@ -76,5 +76,6 @@ export const NumberInput: Component<NumberInputProps> = (props) => {
         onChange={e => onChange(e)}
         onBlur={_ => onBlur()}
         helperText={(!valid() && !isNaN(Number.parseFloat(value() ?? ''))) ? `${props.min ?? '-∞'} to ${props.max ?? '∞'}` : undefined}
+        InputLabelProps={{ shrink: true }}
         InputProps={{ endAdornment: props.units ? <InputAdornment position='end'>{props.units}</InputAdornment> : undefined }} />
 }

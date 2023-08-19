@@ -38,8 +38,8 @@ export interface CropData {
 }
 
 export interface Face {
-    text: string
-    useTitle?: boolean
+    label: string
+    useLabel: boolean
     font: Font
     useDefaultFont?: boolean
     useOppositeImage?: boolean

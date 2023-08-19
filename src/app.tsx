@@ -70,9 +70,9 @@ const defaultFont: Font = {
 }
 
 const defaultFace: Face = {
-    text: '',
+    label: '',
     font: defaultFont,
-    useTitle: true,
+    useLabel: true,
     useDefaultFont: true,
     crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
     feather: 0,
@@ -85,7 +85,7 @@ const defualtConfig: Config = {
     style: {
         title: 'Sample',
         color: { r: 255, g: 255, b: 255 },
-        font: defaultFont,
+        font: { ...defaultFont },
         style: 'default',
     },
     view: {
@@ -94,12 +94,12 @@ const defualtConfig: Config = {
         face: 'front',
     },
     face: {
-        front: { ...defaultFace, text: 'Front' },
-        back: { ...defaultFace, text: 'Back', useOppositeImage: true },
-        top: { ...defaultFace, text: 'Top' },
-        bottom: { ...defaultFace, text: 'Bottom', useOppositeImage: true },
-        left: { ...defaultFace, text: 'Left' },
-        right: { ...defaultFace, text: 'Right', useOppositeImage: true },
+        front: { ...defaultFace },
+        back: { ...defaultFace, useOppositeImage: true },
+        top: { ...defaultFace },
+        bottom: { ...defaultFace, useOppositeImage: true },
+        left: { ...defaultFace },
+        right: { ...defaultFace, useOppositeImage: true },
     },
     size: {
         width: 2.25,
@@ -323,7 +323,7 @@ export const App = () => {
 
         const getFace = (face: Faces): FaceOptions => ({
             ...config.face[face],
-            text: config.face[face].useTitle ? config.style.title : config.face[face].text,
+            text: config.face[face].useLabel ? (config.face[face].label !== '' ? config.face[face].label : config.style.title) : undefined,
             font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
             image: imageCache[face]
         })
@@ -404,13 +404,11 @@ export const App = () => {
     })
     
     const resetConfig = () => {
-        if (confirm('Reset all configuration?')) {
-            setState({ loading: true })
-            localStorage.clear()
-            navigator.storage.getDirectory().then(dir => dir.removeEntry('images', { recursive: true }))
-                .catch(err => err.name != 'NotFoundError' ? console.error(err) : false)
-                .then(() => window.location.reload())
-        }
+        setState({ loading: true })
+        localStorage.clear()
+        navigator.storage.getDirectory().then(dir => dir.removeEntry('images', { recursive: true }))
+            .catch(err => err.name != 'NotFoundError' ? console.error(err) : false)
+            .then(() => window.location.reload())
     }
 
     const savePdf = () => {
@@ -551,20 +549,20 @@ export const App = () => {
                                 <VStack>
                                     <HStack alignItems='center'>
                                         <Typography variant='button'>Use...</Typography>
-                                        <FormControlLabel label='Label' control={<Checkbox checked={!config.face[face].useTitle} onChange={(_, checked) => setConfig('face', face, { useTitle: !checked })} />} />
+                                        <FormControlLabel label='Label' control={<Checkbox checked={config.face[face].useLabel} onChange={(_, checked) => setConfig('face', face, { useLabel: checked })} />} />
                                         <FormControlLabel label='Font' control={<Checkbox checked={!config.face[face].useDefaultFont} onChange={(_, checked) => setConfig('face', face, { useDefaultFont: !checked })} />} />
                                         <Show when={canUseOppositeImage(face)}>
                                             <FormControlLabel label='Image' control={<Checkbox checked={!config.face[face].useOppositeImage} onChange={(_, checked) => setConfig('face', face, { useOppositeImage: !checked })} />} />
                                         </Show>
                                         <HelpButton>
-                                            <p>When <b>Label</b> is checked, this face will use the provided label text. Otherwise, the deck title <i>{config.style.title}</i> will be used.</p>
-                                            <p>When <b>Font</b> is checked, this face will use the selected font styling for its label. Otherwise, the deck's default font will be used.</p>
+                                            <p>When <b>Label</b> is checked, this face will have a label. If no label text is provided, deck title <i>{config.style.title}</i> will be used.</p>
+                                            <p>When <b>Font</b> is checked, this face's label will use the selected font styling. Otherwise, the deck's default font will be used.</p>
                                             <Show when={canUseOppositeImage(face)}>
                                                 <p>When <b>Image</b> is checked, this face may use the selected image file. Otherwise, the <i>{getOppositeFace(face)}</i> face's image (if any) will be used.</p>
                                             </Show>
                                         </HelpButton>
                                     </HStack>
-                                    <TextInput id={`face-${face}-text`} label='Label' disabled={!!config.face[face].useTitle} sx={{ width: '100%' }} value={config.face[face].text} onChange={text => setConfig('face', face, { text })} />
+                                    <TextInput id={`face-${face}-text`} label='Label' disabled={!config.face[face].useLabel} sx={{ width: '100%' }} placeholder={config.style.title} value={config.face[face].label} onChange={text => setConfig('face', face, { label: text })} />
                                     <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                     <HStack>
                                         <ImageSelect id={`face-${face}-image`} disabled={canUseOppositeImage(face) && config.face[face].useOppositeImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
