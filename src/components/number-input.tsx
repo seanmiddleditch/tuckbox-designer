@@ -18,7 +18,7 @@ type NumberInputProps = {
 const isNumeric = (text: string) => /^[0-9]*([.][0-9]*)?$/.test(text)
 
 export const NumberInput: Component<NumberInputProps> = (props) => {
-    const [value, setValue] = createSignal(props.value.toString())
+    const [value, setValue] = createSignal<string|undefined>(undefined)
 
     const onChange = (e: Event) => {
         const input = e.target as HTMLInputElement
@@ -36,11 +36,11 @@ export const NumberInput: Component<NumberInputProps> = (props) => {
     }
 
     const onBlur = () => {
-        setValue(props.value.toString())
+        setValue(undefined)
     }
 
     return <TextField id={props.id} size='small' variant='outlined' sx={{ width: '14ch' }}
-        value={props.disabled ? props.value : value()}
+        value={props.disabled ? props.value : (value() ?? props.value)}
         disabled={props.disabled}
         label={props.label}
         type={props.integer ? 'number' : 'text'}
