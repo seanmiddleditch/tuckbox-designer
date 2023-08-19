@@ -86,7 +86,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
     const instructFont: Font = {
         family: 'Times-Roman',
-        size: 10,
+        size: 9,
         weight: 400,
         color: { r: 0, g: 0, b: 0 },
         outlineColor: { r: 255, g: 255, b: 255 },
@@ -480,7 +480,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.beginPath()
         ctx.textAlign = 'left'
         
-        writeLine(instructions, instructFont, back.x, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
+        writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
     }
     ctx.restore()
 
