@@ -35,7 +35,7 @@ interface Config {
     }
     view: {
         advanced: boolean
-        preview: 'canvas' | 'pdf',
+        preview: 'canvas' | 'canvas-pretty' | 'pdf'
         face: Faces
     }
     face: {
@@ -217,7 +217,7 @@ export const App = () => {
     const [blobCache, setBlobCache] = createStore<FaceCache<Blob>>({})
 
     const [previewCanvas, setPreviewCanvas] = createSignal<HTMLCanvasElement | undefined>(undefined)
-    const [previewFrame, setPreviewFrame] = createSignal<HTMLIFrameElement | undefined>(undefined)
+    const [previewObject, setPreviewObject] = createSignal<HTMLObjectElement | undefined>(undefined)
         
     let pdfDataUrl = ''
     let pdfBlob: Blob|undefined = undefined
@@ -357,6 +357,7 @@ export const App = () => {
             bleed: toPt(config.bleed),
             thickness: toPt(config.thickness),
             margin: toPt(config.margin),
+            prettyPreview: config.view.preview == 'canvas-pretty',
             face
         })
     }
@@ -385,7 +386,20 @@ export const App = () => {
     createEffect(() => {
         const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
 
-        if (config.view.preview == 'canvas') {
+        if (config.view.preview == 'pdf') {
+            const preview = previewObject()
+            if (!preview)
+                return
+
+            const toolbarHeight = 20 // guess at toolbar height for browser PDF viewers
+            
+            preview.width = `${convert(pageSize[0], config.units, 'px')}px`
+            preview.height = `${convert(pageSize[1], config.units, 'px') + toolbarHeight}px` 
+
+            const { url } = generatePdfBlob()
+            preview.data = url
+        }
+        else {
             const canvas = previewCanvas()
             if (!canvas)
                 return
@@ -398,14 +412,7 @@ export const App = () => {
 
             renderTuckBox(ctx)
         }
-        else if (config.view.preview == 'pdf') {
-            const frame = previewFrame()
-            if (!frame)
-                return
 
-            const { url } = generatePdfBlob()
-            frame.src = url
-        }
     })
     
     const resetConfig = () => {
@@ -584,9 +591,11 @@ export const App = () => {
                 <VStack alignItems='flex-start' width='100%'>
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Preview</Typography>
-                        <FormGroup>
-                            <Checkbox label='Live PDF' checked={config.view.preview == 'pdf'} onChange={checked => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />
-                        </FormGroup>
+                        <Select id='preview' width='10em' value={config.view.preview} onChange={preview => setConfig('view', { preview })}>
+                            <Select.Item value='canvas'>Canvas</Select.Item>
+                            <Select.Item value='canvas-pretty'>Canvas (Pretty)</Select.Item>
+                            <Select.Item value='pdf'>Live PDF</Select.Item>
+                        </Select>
                         <Button.Group>
                             <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
                             <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
@@ -597,10 +606,10 @@ export const App = () => {
                         <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
                     </HStack>
                     <Switch fallback={<>
-                        <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
+                        <canvas width='800' height='600' ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
                     </>}>
                         <Match when={config.view.preview == 'pdf'}>
-                            <iframe width="800" height="600" ref={setPreviewFrame} style={{ border: 'none', width: '100%' }}></iframe>
+                            <object ref={setPreviewObject} type='application/pdf' width='800' height='600'><Typography>Loading...</Typography></object>
                         </Match>
                     </Switch>
                     <Typography>Made with <Link href="https://www.solidjs.com/">Solid</Link>, <Link href="https://mui.com/core/">MUI</Link>, <Link href="https://github.com/parallax/jsPDF">jsPDF</Link>, <Link href="https://fengyuanchen.github.io/cropperjs/">Cropper.js</Link>, and <Link href="https://github.com/xbmlz/solid-color">solid-color</Link></Typography>

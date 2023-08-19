@@ -15,6 +15,7 @@ export interface GenerateOptions {
     thickness: number
     margin: number
     style: BoxStyle
+    prettyPreview: boolean
     face: {
         front: FaceOptions
         back: FaceOptions
@@ -357,8 +358,9 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     // box color (overlap to handle bleed)
-    ctx.save()
     if (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1) {
+        ctx.save()
+
         ctx.setLineDash([])
         ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
         ctx.strokeStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
@@ -367,80 +369,22 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.beginPath()
 
         pathOutline()
-        ctx.stroke()
+        if (!options.prettyPreview)
+            ctx.stroke()
         ctx.fill()
+        ctx.restore()
     }
-    ctx.restore()
-
-    // stroke & fill outline
-    ctx.save()
-    {
-        ctx.beginPath()
-
-        pathOutline()
-
-        ctx.setLineDash([])
-        ctx.lineWidth = lineWidth
-        ctx.strokeStyle = cutColor
-
-        ctx.stroke()
-    }
-    ctx.restore()
-
-    // stroke inner cut lines
-    ctx.save()
-    {
-        ctx.beginPath()
-
-        pathCuts()
-
-        ctx.setLineDash([])
-        ctx.lineWidth = lineWidth
-        ctx.strokeStyle = cutColor
-
-        ctx.stroke()
-    }
-    ctx.restore()
-
-    // stroke fold lines
-    ctx.save()
-    {
-        ctx.beginPath()
-
-        pathScores()
-
-        ctx.setLineDash(foldDash)
-        ctx.lineWidth = lineWidth
-        ctx.strokeStyle = scoreColor
-
-        ctx.stroke()
-    }
-    ctx.restore()
-
-    // glue region
-    ctx.save()
-    {
-        ctx.beginPath()
-        ctx.fillStyle = innerColor
-        ctx.textAlign = 'center'
-        ctx.textBaseline = 'middle'
-
-        ctx.fillRect(back.x + back.width + options.bleed, back.y + options.bleed, size.depth * 0.8 - options.bleed * 2, back.height - options.bleed * 2)
-        writeCenterAngle('Glue Here (A)', instructFont, back.x + back.width + size.depth * 0.4, back.y + back.height * 0.5, Math.PI * 0.5, back.height - options.bleed * 2)
-
-        if (options.style != 'double-tuck') {
-            ctx.fillRect(back.x + options.bleed, back.y + back.height + options.bleed, back.width - options.bleed * 2, size.depth * 0.8 - options.bleed * 2)
-            writeCenterAngle('Glue Here (B)', instructFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.4, Math.PI, back.width - options.bleed * 2)
-        }
-    }
-
+    
     // images
-    ctx.save()
     {
-        // clip within outline
-        ctx.beginPath()
-        pathOutline()
-        ctx.clip()
+        ctx.save()
+
+        // clip in preview mode, mostly for the back face cutout
+        if (options.prettyPreview) {
+            ctx.beginPath()
+            pathOutline()
+            ctx.clip()
+        }
 
         if (options.face.front.image)
             drawImage(front.x, front.y, front.width, front.height, options.face.front.image)
@@ -459,28 +403,94 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         
         if (options.face.right.image)
             drawImage(back.x - size.depth, back.y + back.height, back.height, size.depth, options.face.right.image, Math.PI * 1.5)
-    }
-    ctx.restore()
 
+        ctx.restore()
+    }
+    
     // text labels
-    ctx.save()
     {
+        ctx.save()
         ctx.beginPath()
         ctx.fillStyle = '#000000'
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
         drawText()
+        ctx.restore()
     }
-    ctx.restore()
+
+    // stroke outline
+    if (!options.prettyPreview) {
+        ctx.save()
+        ctx.beginPath()
+
+        pathOutline()
+
+        ctx.setLineDash([])
+        ctx.lineWidth = lineWidth
+        ctx.strokeStyle = cutColor
+
+        ctx.stroke()
+        ctx.restore()
+    }
+
+    // stroke inner cut lines
+    if (!options.prettyPreview) {
+        ctx.save()
+        ctx.beginPath()
+
+        pathCuts()
+
+        ctx.setLineDash([])
+        ctx.lineWidth = lineWidth
+        ctx.strokeStyle = cutColor
+
+        ctx.stroke()
+        ctx.restore()
+    }
+
+    // stroke fold lines
+    if (!options.prettyPreview) {
+        ctx.save()
+        ctx.beginPath()
+
+        pathScores()
+
+        ctx.setLineDash(foldDash)
+        ctx.lineWidth = lineWidth
+        ctx.strokeStyle = scoreColor
+
+        ctx.stroke()
+        ctx.restore()
+    }
+
+    // glue region
+    {
+        ctx.save()
+        ctx.beginPath()
+        ctx.fillStyle = innerColor
+        ctx.textAlign = 'center'
+        ctx.textBaseline = 'middle'
+
+        ctx.fillRect(back.x + back.width + options.bleed, back.y + options.bleed, size.depth * 0.8 - options.bleed * 2, back.height - options.bleed * 2)
+        writeCenterAngle('Glue Here (A)', instructFont, back.x + back.width + size.depth * 0.4, back.y + back.height * 0.5, Math.PI * 0.5, back.height - options.bleed * 2)
+
+        if (options.style != 'double-tuck') {
+            ctx.fillRect(back.x + options.bleed, back.y + back.height + options.bleed, back.width - options.bleed * 2, size.depth * 0.8 - options.bleed * 2)
+            writeCenterAngle('Glue Here (B)', instructFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.4, Math.PI, back.width - options.bleed * 2)
+        }
+
+        ctx.restore()
+    }
 
     // instructions
-    ctx.save()
-    {
+    if (!options.prettyPreview) {
+        ctx.save()
         ctx.beginPath()
         ctx.textAlign = 'left'
         
         writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
+
+        ctx.restore()
     }
-    ctx.restore()
 }

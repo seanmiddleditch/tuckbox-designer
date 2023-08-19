@@ -43,6 +43,7 @@ export interface Face {
     font: Font
     useDefaultFont: boolean
     useOppositeImage: boolean
+    useImage: boolean
     cloneOpposite: boolean
     crop: CropData
     feather: number
