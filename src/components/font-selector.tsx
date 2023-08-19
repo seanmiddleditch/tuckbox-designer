@@ -6,6 +6,7 @@ import { Select } from './select'
 import { HStack, VStack } from './stack'
 import { Component, createSignal } from 'solid-js'
 import { colorToString } from '../color'
+import { HelpButton } from './help-button'
 
 interface FontSelectorProps {
     id: string
@@ -64,7 +65,7 @@ export const FontSelector = (props: FontSelectorProps) => {
         <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={isOpen()} onClose={onClose}>
             <Box sx={{ border: 1, p: 3, bgcolor: 'background.paper' }}>
                 <VStack>
-                    <HStack>
+                    <HStack alignItems='center'>
                         <Select id={`${props.id}-font-family`} label='Font Family' disabled={props.disabled} value={props.value.family} onChange={family => props.onChange({ family })}>
                             <Select.Item value='Courier'>Courier</Select.Item>
                             <Select.Item value='Helvetica'>Helvetica</Select.Item>
@@ -75,7 +76,7 @@ export const FontSelector = (props: FontSelectorProps) => {
                     </HStack>
                     <HStack>
                         <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.disabled} color={props.value.color} onChange={color => props.onChange({ color })} />
-                        <NumberInput id={`${props.id}-font-outline-width`} label='Width' disabled={props.disabled} value={props.value.outlineWidth} onChange={outlineWidth => props.onChange({ outlineWidth })} />
+                        <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' units='px' disabled={props.disabled} value={props.value.outlineWidth} onChange={outlineWidth => props.onChange({ outlineWidth })} />
                         <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.disabled} color={props.value.outlineColor} onChange={outlineColor => props.onChange({ outlineColor })} />
                     </HStack>
                 </VStack>

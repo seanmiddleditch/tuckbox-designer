@@ -1,8 +1,8 @@
 import { FormControl, Select as SuidSelect, InputLabel, MenuItem } from '@suid/material'
-import { JSX } from 'solid-js'
+import { Component, JSX } from 'solid-js'
 
 interface SelectItemProps {
-    value: string,
+    value: string | number
     children: JSX.Element
 }
 
@@ -13,7 +13,7 @@ interface SelectProps<T> {
     width?: string
     disabled?: boolean
     onChange: (value: T) => void
-    children: JSX.Element
+    children: JSX.ArrayElement
 }
 
 export const Select = <T,>(props: SelectProps<T>) => (<FormControl sx={{ width: props.width }}>

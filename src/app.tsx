@@ -13,13 +13,14 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
-import { Checkbox, FormControlLabel, FormGroup, Typography, Link, Container } from '@suid/material'
+import { Checkbox, FormControlLabel, FormGroup, Typography, Link, Container, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
 import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
+import { HelpButton } from './components/help-button'
 
 interface Config {
     units: Units
@@ -114,6 +115,17 @@ interface AppState {
 const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
 
 const canUseOppositeImage = (face: Faces) => face == 'back' || face == 'bottom' || face == 'right'
+
+const getOppositeFace = (face: Faces) => {
+    switch (face) {
+        case 'front': return 'back'
+        case 'back': return 'front'
+        case 'top': return 'bottom'
+        case 'bottom': return 'top'
+        case 'left': return 'right'
+        case 'right': return 'left'
+    }
+}
 
 const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RGB): Promise<HTMLCanvasElement> => {
     const img = new Image()
@@ -392,6 +404,28 @@ export const App = () => {
         })
     }
 
+    const ResetButton = (props: { onReset: () => void }) => {
+        const [open, setOpen] = createSignal(false)
+
+        const onClick = () => setOpen(true)
+        const onCancel = () => setOpen(false)
+        const onAccept = () => { setOpen(false); props.onReset(); }
+
+        return <>
+            <Button variant='outlined' color='error' onClick={onClick}>Reset</Button>
+            <Dialog open={open()} onClose={onCancel}>
+                <DialogTitle>Reset Current Design</DialogTitle>
+                <DialogContent>
+                    <DialogContentText>Clicking <b>Reset</b> will clear all elements of the design back to their defaults.</DialogContentText>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={onCancel}>Keep Design</Button>
+                    <Button color='error' onClick={onAccept}>Reset</Button>
+                </DialogActions>
+            </Dialog>
+        </>
+    }
+
     return <Show when={!state.loading} fallback={'Loading...'}>
         <VStack>
             <HStack alignItems='baseline'>
@@ -407,9 +441,6 @@ export const App = () => {
                         <FormGroup>
                             <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
                         </FormGroup>
-                        <Button.Group>
-                            <Button variant='outlined' color='error' onClick={resetConfig}>Reset</Button>
-                        </Button.Group>
                     </HStack>
                     <HStack>
                         <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
@@ -427,7 +458,7 @@ export const App = () => {
                         <HStack>
                             <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
                             <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
-                            <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
+                            <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })} />
                         </HStack>
                     </Show>
                     <Typography variant='h6'>Deck Size</Typography>
@@ -438,12 +469,16 @@ export const App = () => {
                     </HStack>
                     <Typography variant='h6'>Styling</Typography>
                     <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
-                    <HStack>
+                    <HStack alignItems='center'>
                         <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
                         <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
                             <Select.Item value='default'>Default</Select.Item>
                             <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
                         </Select>
+                        <HelpButton>
+                            <p>The <b>Default</b> box style requires gluing the bottom box flaps.</p>
+                            <p>The <b>Bottom Tuck</b> box style uses a tuck flap on the bottom of the box.</p>
+                        </HelpButton>
                     </HStack>
                     <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
                     <HStack alignItems='baseline'>
@@ -465,7 +500,16 @@ export const App = () => {
                                         <Typography variant='button'>Use...</Typography>
                                         <FormControlLabel label='Label' control={<Checkbox checked={!config.face[face].useTitle} onChange={(_, checked) => setConfig('face', face, { useTitle: !checked })} />} />
                                         <FormControlLabel label='Font' control={<Checkbox checked={!config.face[face].useDefaultFont} onChange={(_, checked) => setConfig('face', face, { useDefaultFont: !checked })} />} />
-                                        <FormControlLabel label='Image' control={<Checkbox disabled={!canUseOppositeImage(face)} checked={!config.face[face].useOppositeImage} onChange={(_, checked) => setConfig('face', face, { useOppositeImage: !checked })} />} />
+                                        <Show when={canUseOppositeImage(face)}>
+                                            <FormControlLabel label='Image' control={<Checkbox checked={!config.face[face].useOppositeImage} onChange={(_, checked) => setConfig('face', face, { useOppositeImage: !checked })} />} />
+                                        </Show>
+                                        <HelpButton>
+                                            <p>When <b>Label</b> is checked, this face will use the provided label text. Otherwise, the deck title <i>{config.style.title}</i> will be used.</p>
+                                            <p>When <b>Font</b> is checked, this face will use the selected font styling for its label. Otherwise, the deck's default font will be used.</p>
+                                            <Show when={canUseOppositeImage(face)}>
+                                                <p>When <b>Image</b> is checked, this face may use the selected image file. Otherwise, the <i>{getOppositeFace(face)}</i> face's image (if any) will be used.</p>
+                                            </Show>
+                                        </HelpButton>
                                     </HStack>
                                     <TextInput id={`face-${face}-text`} label='Label' disabled={!!config.face[face].useTitle} sx={{ width: '100%' }} value={config.face[face].text} onChange={text => setConfig('face', face, { text })} />
                                     <HStack>
@@ -477,7 +521,7 @@ export const App = () => {
                         </For>
                     </Switch>
                 </VStack>
-                <VStack alignItems='flex-start'>
+                <VStack alignItems='flex-start' width='100%'>
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Preview</Typography>
                         <FormGroup>
@@ -486,6 +530,9 @@ export const App = () => {
                         <Button.Group>
                             <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
                             <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
+                        </Button.Group>
+                        <Button.Group>
+                            <ResetButton onReset={resetConfig}/>
                         </Button.Group>
                         <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
                     </HStack>
