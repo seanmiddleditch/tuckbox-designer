@@ -76,6 +76,7 @@ const defaultFace: Face = {
     useLabel: true,
     useDefaultFont: true,
     useOppositeImage: true,
+    useImage: false,
     cloneOpposite: false,
     crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
     feather: 0,
@@ -97,12 +98,12 @@ const defualtConfig: Config = {
         face: 'front',
     },
     face: {
-        front: { ...defaultFace },
-        back: { ...defaultFace, useOppositeImage: true },
-        top: { ...defaultFace },
-        bottom: { ...defaultFace, useOppositeImage: true },
-        left: { ...defaultFace },
-        right: { ...defaultFace, useOppositeImage: true },
+        front: { ...defaultFace, useImage: true, useLabel: true },
+        back: { ...defaultFace, cloneOpposite: true },
+        top: { ...defaultFace, useImage: true },
+        bottom: { ...defaultFace, cloneOpposite: true },
+        left: { ...defaultFace, useImage: true },
+        right: { ...defaultFace, cloneOpposite: true },
     },
     size: {
         width: 2.25,
@@ -120,7 +121,7 @@ interface AppState {
 
 const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
 
-const canUseOppositeImage = (face: Faces) => face == 'back' || face == 'bottom' || face == 'right'
+const canCloneOpposite = (face: Faces) => face == 'back' || face == 'bottom' || face == 'right'
 
 const getOppositeFace = (face: Faces) => {
     switch (face) {
@@ -325,14 +326,17 @@ export const App = () => {
         }
 
         const getFace = (face: Faces): FaceOptions => {
-            if (canUseOppositeImage(face) && config.face[face].cloneOpposite)
-                return getFace(getOppositeFace(face))
+            const canClone = canCloneOpposite(face)
+            const opposite = getOppositeFace(face)
+
+            if (canClone && config.face[face].cloneOpposite)
+                return getFace(opposite)
 
             return {
                 ...config.face[face],
                 text: config.face[face].useLabel ? (config.face[face].label !== '' ? config.face[face].label : config.style.title) : undefined,
                 font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
-                image: imageCache[face]
+                image: config.face[face].useImage ? ((imageCache[face] || !canClone) ? imageCache[face] : imageCache[opposite]) : undefined,
             }
         }
 
@@ -344,13 +348,6 @@ export const App = () => {
             left: getFace('left'),
             right: getFace('right'),
         }
-
-        if (config.face.back.useOppositeImage)
-            face.back.image = face.front.image
-        if (config.face.bottom.useOppositeImage)
-            face.bottom.image = face.top.image
-        if (config.face.right.useOppositeImage)
-            face.right.image = face.left.image
 
         generate(ctx, {
             size,
@@ -550,7 +547,7 @@ export const App = () => {
                             <Select.Item value='left'>Left</Select.Item>
                             <Select.Item value='right'>Right</Select.Item>
                         </Select>
-                        <Show when={canUseOppositeImage(config.view.face)}>
+                        <Show when={canCloneOpposite(config.view.face)}>
                             <Checkbox label={`Clone ${getOppositeFace(config.view.face)}`} checked={config.face[config.view.face].cloneOpposite ?? false} onChange={cloneOpposite => setConfig('face', config.view.face, { cloneOpposite })} />
                             <HelpButton>
                                 <p>When <b>Clone {getOppositeFace(config.view.face)}</b> is checked, all elements of the <i>{getOppositeFace(config.view.face)}</i> face will be used for this face.</p>
@@ -564,24 +561,20 @@ export const App = () => {
                                     <HStack alignItems='center'>
                                         <Typography variant='button'>Use...</Typography>
                                         <Checkbox label='Label' checked={config.face[face].useLabel} onChange={useLabel => setConfig('face', face, { useLabel })} />
-                                        <Checkbox label='Font' disabled={!config.face[face].useLabel} checked={config.face[face].useDefaultFont} onChange={useDefaultFont => setConfig('face', face, { useDefaultFont })} />
-                                        <Show when={canUseOppositeImage(face)}>
-                                            <Checkbox label='Image' checked={!config.face[face].useOppositeImage} onChange={checked => setConfig('face', face, { useOppositeImage: !checked })} />
-                                        </Show>
+                                        <Checkbox label='Font' disabled={!config.face[face].useLabel} checked={!config.face[face].useDefaultFont} onChange={checked => setConfig('face', face, { useDefaultFont: !checked })} />
+                                        <Checkbox label='Image' checked={config.face[face].useImage} onChange={useImage => setConfig('face', face, { useImage })} />
                                         <HelpButton>
                                             <p>When <b>Label</b> is checked, this face will have a label. If no label text is provided, deck title <i>{config.style.title}</i> will be used.</p>
                                             <p>When <b>Font</b> is checked, this face's label will use the selected font styling. Otherwise, the deck's default font will be used.</p>
-                                            <Show when={canUseOppositeImage(face)}>
-                                                <p>When <b>Image</b> is checked, this face may use the selected image file. Otherwise, the <i>{getOppositeFace(face)}</i> face's image (if any) will be used.</p>
-                                            </Show>
+                                            <p>When <b>Image</b> is checked, this face may use the selected image file. <Show when={canCloneOpposite(face)}>If no image is selected, the <i>{getOppositeFace(face)}</i> image will be used.</Show></p>
                                         </HelpButton>
                                     </HStack>
                                     <TextInput id={`face-${face}-text`} label='Label' disabled={!config.face[face].useLabel} sx={{ width: '100%' }} placeholder={config.style.title} value={config.face[face].label} onChange={text => setConfig('face', face, { label: text })} />
                                     <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                     <HStack>
-                                        <ImageSelect id={`face-${face}-image`} disabled={canUseOppositeImage(face) && config.face[face].useOppositeImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
-                                        <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || (canUseOppositeImage(face) && config.face[face].useOppositeImage)} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
-                                        <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || (canUseOppositeImage(face) && config.face[face].useOppositeImage)} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })}/>
+                                        <ImageSelect id={`face-${face}-image`} disabled={!config.face[face].useImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
+                                        <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || !config.face[face].useImage} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
+                                        <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || !config.face[face].useImage} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })}/>
                                     </HStack>
                                 </VStack>
                             </Match>}
