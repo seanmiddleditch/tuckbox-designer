@@ -108,7 +108,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.lineTo(front.x + front.width, front.y - size.depth * 0.6)
 
         // left (top)
-        ctx.arc(front.x + front.width + size.depth * 0.5, front.y - size.depth * 0.1, size.depth * 0.5, Math.PI * 1.5, Math.PI * 2)
+        ctx.arc(front.x + front.width + size.depth * 0.7, front.y - size.depth * 0.3, size.depth * 0.3, Math.PI * 1.5, Math.PI * 2)
         ctx.lineTo(back.x, back.y)
     
         // back (top)
@@ -131,15 +131,18 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         }
 
         // left (bottom)
-        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
+        if (options.style == 'double-tuck') {
+            ctx.arc(back.x - size.depth * 0.3, back.y + back.height + size.depth * 0.3, size.depth * 0.3, 0, Math.PI * 0.5)
+        }
+        else {
+            ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
+        }
         ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
         // inner bottom
         if (options.style == 'double-tuck') {
-            //ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
             ctx.arc(front.x + front.width - front.width * 0.2, front.y + front.height + size.depth, front.width * 0.2, 0, Math.PI * 0.5)
             ctx.arc(front.x + front.width * 0.2, front.y + front.height + size.depth, front.width * 0.2, Math.PI * 0.5, Math.PI)
-            //ctx.arc(front.x + front.width * 0.8, front.y + front.height + size.depth, front.width * 0.2, Math.PI, Math.PI * 1.5)
             ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
         }
         else {
@@ -149,9 +152,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         }
         
         // right
-        ctx.lineTo(front.x - size.depth, front.y + front.height + size.depth * 0.6)
+        if (options.style == 'double-tuck') {
+            ctx.arc(front.x - size.depth * 0.7, front.y + front.height + size.depth * 0.3, size.depth * 0.3, Math.PI * 0.5, Math.PI)
+        }
+        else {
+            ctx.lineTo(front.x - size.depth, front.y + front.height + size.depth * 0.6)
+        }
         ctx.lineTo(front.x - size.depth, front.y)
-        ctx.arc(front.x - size.depth * 0.5, front.y - size.depth * 0.1, size.depth * 0.5, Math.PI, Math.PI * 1.5)
+        ctx.arc(front.x - size.depth * 0.7, front.y - size.depth * 0.3, size.depth * 0.3, Math.PI, Math.PI * 1.5)
         ctx.lineTo(front.x, front.y - size.depth * 0.6)
     }
 
@@ -170,6 +178,9 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         ctx.moveTo(front.x, front.y + front.height)
         ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
+        
+        ctx.moveTo(front.x + front.width, front.y + front.height)
+        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
         if (options.style == 'double-tuck') {
             ctx.moveTo(front.x, front.y + front.height + size.depth)
@@ -178,12 +189,10 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             ctx.moveTo(front.x + front.width * 0.9, front.y + front.height + size.depth)
             ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
         }
-
-        ctx.moveTo(front.x + front.width, front.y + front.height)
-        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
-
-        ctx.moveTo(back.x, back.y + back.height + size.depth * 0.6)
-        ctx.lineTo(back.x, back.y + back.height)
+        else {
+            ctx.moveTo(back.x, back.y + back.height + size.depth * 0.6)
+            ctx.lineTo(back.x, back.y + back.height)
+        }
     }
 
     const pathScores = () => {
