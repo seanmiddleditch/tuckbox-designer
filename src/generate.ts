@@ -1,4 +1,5 @@
 import { Size, Font, RGB, Faces, BoxStyle } from './types'
+import { luminosity } from './color'
 
 export interface FaceOptions {
     text?: string
@@ -76,6 +77,10 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
             ctx.lineWidth = 1
         }
     }
+
+    const bgLuminosity = luminosity(options.color)
+    const cutColor = bgLuminosity < .7 ? '#fff' : '#000'
+    const scoreColor = bgLuminosity < .7 ? '#eee' : '#111'
 
     const pathOutline = () => {
         // top
@@ -164,7 +169,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.lineTo(back.x, back.y + back.height)
     }
 
-    const pathFolds = () => {
+    const pathScores = () => {
         // inner bottom
         ctx.moveTo(front.x, front.y + front.height)
         ctx.lineTo(front.x + front.width, front.y + front.height)
@@ -346,7 +351,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         ctx.setLineDash([])
         ctx.lineWidth = lineWidth
-        ctx.strokeStyle = '#000000'
+        ctx.strokeStyle = cutColor
 
         ctx.stroke()
     }
@@ -361,7 +366,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         ctx.setLineDash([])
         ctx.lineWidth = lineWidth
-        ctx.strokeStyle = '#000000'
+        ctx.strokeStyle = cutColor
 
         ctx.stroke()
     }
@@ -372,11 +377,11 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     {
         ctx.beginPath()
 
-        pathFolds()
+        pathScores()
 
         ctx.setLineDash(foldDash)
         ctx.lineWidth = lineWidth
-        ctx.strokeStyle = '#666666'
+        ctx.strokeStyle = scoreColor
 
         ctx.stroke()
     }
