@@ -1,5 +1,5 @@
 import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal, For } from 'solid-js'
-import { createStore, unwrap } from 'solid-js/store'
+import { createStore } from 'solid-js/store'
 import { paperSize, PaperFormats } from './paper'
 import { convert, Units } from './convert'
 import { FaceOptions, generate, getFaceDimensions } from './generate'
@@ -13,8 +13,8 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
-import { Checkbox, FormControlLabel, FormGroup, Typography } from '@suid/material'
-import { Download as DownloadIcon } from '@suid/icons-material'
+import { Checkbox, FormControlLabel, FormGroup, Typography, Link, Container } from '@suid/material'
+import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
@@ -154,7 +154,6 @@ export const App = () => {
     const [imageCache, setImageCache] = createStore<FaceCache<HTMLCanvasElement>>({})
     const [blobCache, setBlobCache] = createStore<FaceCache<Blob>>({})
 
-    const [pageDetailsDiv, setPageDetailsDiv] = createSignal<HTMLDivElement | undefined>(undefined)
     const [previewCanvas, setPreviewCanvas] = createSignal<HTMLCanvasElement | undefined>(undefined)
     const [previewFrame, setPreviewFrame] = createSignal<HTMLIFrameElement | undefined>(undefined)
         
@@ -316,11 +315,6 @@ export const App = () => {
     createEffect(() => {
         const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
 
-        const detailsDiv = pageDetailsDiv()
-        if (detailsDiv) {
-            detailsDiv.textContent = `${config.page} ${Number.parseFloat(pageSize[0].toFixed(2))}x${Number.parseFloat(pageSize[1].toFixed(2))}${config.units}`
-        }
-
         if (config.view.preview == 'canvas') {
             const canvas = previewCanvas()
             if (!canvas)
@@ -400,10 +394,16 @@ export const App = () => {
 
     return <Show when={!state.loading} fallback={'Loading...'}>
         <VStack>
+            <HStack alignItems='baseline'>
+                <Typography variant='h3'>Tuckbox Designer</Typography>
+                <Typography>by Sean Middleditch</Typography>
+                <Typography><BugIcon fontSize='small' style='display: inline-flex; vertical-align: top'/> <Link href="https://github.com/seanmiddleditch/tuckbox-designer">Issue Tracker &amp; Source Code</Link></Typography>
+                <Typography><CopyrightIcon fontSize='small' style='display: inline-flex; vertical-align: top'/> <Link href="https://creativecommons.org/publicdomain/zero/1.0/legalcode">Creative Commons Zero</Link></Typography>
+            </HStack>
             <HStack spacing={8} width='100%' height='100%'>
                 <VStack>
                     <HStack alignItems='center'>
-                        <h2>Page & Print</h2>
+                        <Typography variant='h6'>Page &amp; Print</Typography>
                         <FormGroup>
                             <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
                         </FormGroup>
@@ -430,25 +430,24 @@ export const App = () => {
                             <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })}/>
                         </HStack>
                     </Show>
-                    <h2>Deck Size</h2>
+                    <Typography variant='h6'>Deck Size</Typography>
                     <HStack>
                         <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
                         <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
                         <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                     </HStack>
-                    <h2>Styling</h2>
-                    <VStack alignItems='flex-start'>
-                        <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
+                    <Typography variant='h6'>Styling</Typography>
+                    <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
+                    <HStack>
                         <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
-                    </VStack>
-                    <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
-                        <Select.Item value='default'>Default</Select.Item>
-                        <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
-                    </Select>
-                    <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
+                        <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
+                            <Select.Item value='default'>Default</Select.Item>
+                            <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
+                        </Select>
+                    </HStack>
                     <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
                     <HStack alignItems='baseline'>
-                        <h2>Faces</h2>
+                        <Typography variant='h6'>Faces</Typography>
                         <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
                             <Select.Item value='front'>Front</Select.Item>
                             <Select.Item value='back'>Back</Select.Item>
@@ -461,7 +460,7 @@ export const App = () => {
                     <Switch>
                         <For each={faces}>
                             {face => <Match when={config.view.face == face}>
-                                <>
+                                <VStack>
                                     <HStack alignItems='center'>
                                         <Typography variant='button'>Use...</Typography>
                                         <FormControlLabel label='Label' control={<Checkbox checked={!config.face[face].useTitle} onChange={(_, checked) => setConfig('face', face, { useTitle: !checked })} />} />
@@ -473,23 +472,22 @@ export const App = () => {
                                         <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                         <ImageSelect id={`face-${face}-image`} disabled={canUseOppositeImage(face) && config.face[face].useOppositeImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
                                     </HStack>
-                                </>
+                                </VStack>
                             </Match>}
                         </For>
                     </Switch>
-                    <h2>Download</h2>
-                    <Button.Group>
-                        <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
-                        <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
-                    </Button.Group>
-                    <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
                 </VStack>
-                <VStack width='100%' alignItems='flex-start'>
+                <VStack alignItems='flex-start'>
                     <HStack alignItems='center'>
-                        <h2>Preview</h2>
+                        <Typography variant='h6'>Preview</Typography>
                         <FormGroup>
                             <FormControlLabel label='Live PDF' control={<Checkbox checked={config.view.preview == 'pdf'} onChange={(_, checked) => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />} />
                         </FormGroup>
+                        <Button.Group>
+                            <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>
+                            <Button onClick={() => savePdf()} variant='contained'><DownloadIcon/></Button>
+                        </Button.Group>
+                        <a class="hidden" ref={pdfLinkRef} style={{ display: 'none' }}></a>
                     </HStack>
                     <Switch fallback={<>
                         <canvas width="800" height="600" ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
@@ -498,10 +496,9 @@ export const App = () => {
                             <iframe width="800" height="600" ref={setPreviewFrame} style={{ border: 'none', width: '100%' }}></iframe>
                         </Match>
                     </Switch>
-                    <div ref={setPageDetailsDiv}></div>
+                    <Typography>Made with <Link href="https://www.solidjs.com/">Solid</Link>, <Link href="https://mui.com/core/">MUI</Link>, <Link href="https://github.com/parallax/jsPDF">jsPDF</Link>, <Link href="https://fengyuanchen.github.io/cropperjs/">Cropper.js</Link>, and <Link href="https://github.com/xbmlz/solid-color">solid-color</Link></Typography>
                 </VStack>
             </HStack>
-            <div>Tuckbox Designer by Sean Middleditch :: <a href="https://github.com/seanmiddleditch/tuckbox-designer">GitHub</a></div>
         </VStack>
     </Show>
 }
