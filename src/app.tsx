@@ -8,12 +8,13 @@ import PDFDocument from 'jspdf'
 import { Button } from './components/button'
 import { HStack, VStack } from './components/stack'
 import { Select } from './components/select'
+import { Checkbox } from './components/checkbox'
 import { ColorPicker } from './components/color-picker'
 import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
-import { Checkbox, FormControlLabel, FormGroup, Typography, Link, Container, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
+import { FormControlLabel, FormGroup, Typography, Link, Container, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
 import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
@@ -74,6 +75,8 @@ const defaultFace: Face = {
     font: defaultFont,
     useLabel: true,
     useDefaultFont: true,
+    useOppositeImage: true,
+    cloneOpposite: false,
     crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
     feather: 0,
     opacity: 1.0,
@@ -321,12 +324,17 @@ export const App = () => {
             depth: toPt(config.size.depth)
         }
 
-        const getFace = (face: Faces): FaceOptions => ({
-            ...config.face[face],
-            text: config.face[face].useLabel ? (config.face[face].label !== '' ? config.face[face].label : config.style.title) : undefined,
-            font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
-            image: imageCache[face]
-        })
+        const getFace = (face: Faces): FaceOptions => {
+            if (canUseOppositeImage(face) && config.face[face].cloneOpposite)
+                return getFace(getOppositeFace(face))
+
+            return {
+                ...config.face[face],
+                text: config.face[face].useLabel ? (config.face[face].label !== '' ? config.face[face].label : config.style.title) : undefined,
+                font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
+                image: imageCache[face]
+            }
+        }
 
         const face = {
             front: getFace('front'),
@@ -490,7 +498,7 @@ export const App = () => {
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Page &amp; Print</Typography>
                         <FormGroup>
-                            <FormControlLabel label='Advanced' control={<Checkbox checked={config.view.advanced} onChange={(_, checked) => setConfig('view', 'advanced', checked)} />} />
+                            <Checkbox label='Advanced' checked={config.view.advanced} onChange={advanced => setConfig('view', { advanced })} />
                         </FormGroup>
                     </HStack>
                     <HStack>
@@ -532,9 +540,9 @@ export const App = () => {
                         </HelpButton>
                     </HStack>
                     <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
-                    <HStack alignItems='baseline'>
+                    <HStack alignItems='center'>
                         <Typography variant='h6'>Faces</Typography>
-                        <Select id='current-face' label='Face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
+                        <Select id='current-face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
                             <Select.Item value='front'>Front</Select.Item>
                             <Select.Item value='back'>Back</Select.Item>
                             <Select.Item value='top'>Top</Select.Item>
@@ -542,6 +550,12 @@ export const App = () => {
                             <Select.Item value='left'>Left</Select.Item>
                             <Select.Item value='right'>Right</Select.Item>
                         </Select>
+                        <Show when={canUseOppositeImage(config.view.face)}>
+                            <Checkbox label={`Clone ${getOppositeFace(config.view.face)}`} checked={config.face[config.view.face].cloneOpposite ?? false} onChange={cloneOpposite => setConfig('face', config.view.face, { cloneOpposite })} />
+                            <HelpButton>
+                                <p>When <b>Clone {getOppositeFace(config.view.face)}</b> is checked, all elements of the <i>{getOppositeFace(config.view.face)}</i> face will be used for this face.</p>
+                            </HelpButton>
+                        </Show>
                     </HStack>
                     <Switch>
                         <For each={faces}>
@@ -549,10 +563,10 @@ export const App = () => {
                                 <VStack>
                                     <HStack alignItems='center'>
                                         <Typography variant='button'>Use...</Typography>
-                                        <FormControlLabel label='Label' control={<Checkbox checked={config.face[face].useLabel} onChange={(_, checked) => setConfig('face', face, { useLabel: checked })} />} />
-                                        <FormControlLabel label='Font' control={<Checkbox checked={!config.face[face].useDefaultFont} onChange={(_, checked) => setConfig('face', face, { useDefaultFont: !checked })} />} />
+                                        <Checkbox label='Label' checked={config.face[face].useLabel} onChange={useLabel => setConfig('face', face, { useLabel })} />
+                                        <Checkbox label='Font' disabled={!config.face[face].useLabel} checked={config.face[face].useDefaultFont} onChange={useDefaultFont => setConfig('face', face, { useDefaultFont })} />
                                         <Show when={canUseOppositeImage(face)}>
-                                            <FormControlLabel label='Image' control={<Checkbox checked={!config.face[face].useOppositeImage} onChange={(_, checked) => setConfig('face', face, { useOppositeImage: !checked })} />} />
+                                            <Checkbox label='Image' checked={!config.face[face].useOppositeImage} onChange={checked => setConfig('face', face, { useOppositeImage: !checked })} />
                                         </Show>
                                         <HelpButton>
                                             <p>When <b>Label</b> is checked, this face will have a label. If no label text is provided, deck title <i>{config.style.title}</i> will be used.</p>
@@ -578,7 +592,7 @@ export const App = () => {
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Preview</Typography>
                         <FormGroup>
-                            <FormControlLabel label='Live PDF' control={<Checkbox checked={config.view.preview == 'pdf'} onChange={(_, checked) => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />} />
+                            <Checkbox label='Live PDF' checked={config.view.preview == 'pdf'} onChange={checked => setConfig('view', 'preview', checked ? 'pdf' : 'canvas')} />
                         </FormGroup>
                         <Button.Group>
                             <Button onClick={() => openPdf()} variant='contained'>Open PDF</Button>

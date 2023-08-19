@@ -8,9 +8,10 @@ interface SelectItemProps {
 
 interface SelectProps<T> {
     id: string
-    label: string
+    label?: string
     value: T
     width?: string
+    variant?: 'standard' | 'outlined'
     disabled?: boolean
     onChange: (value: T) => void
     children: JSX.ArrayElement
@@ -18,7 +19,7 @@ interface SelectProps<T> {
 
 export const Select = <T,>(props: SelectProps<T>) => (<FormControl sx={{ width: props.width }}>
     <InputLabel for={props.id}>{props.label}</InputLabel>
-    <SuidSelect id={props.id} size='small' label={props.label} disabled={props.disabled} value={props.value} onChange={e => props.onChange(e.target.value)}>
+    <SuidSelect id={props.id} size='small' variant={props.variant ?? 'outlined'} label={props.label} disabled={props.disabled} value={props.value} onChange={e => props.onChange(e.target.value)}>
         {props.children}
     </SuidSelect>
 </FormControl>)

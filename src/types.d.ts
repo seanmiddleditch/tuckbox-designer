@@ -41,8 +41,9 @@ export interface Face {
     label: string
     useLabel: boolean
     font: Font
-    useDefaultFont?: boolean
-    useOppositeImage?: boolean
+    useDefaultFont: boolean
+    useOppositeImage: boolean
+    cloneOpposite: boolean
     crop: CropData
     feather: number
     opacity: number
