@@ -1,4 +1,4 @@
-import { Size, Font, RGB, Faces } from './types'
+import { Size, Font, RGB, Faces, BoxStyle } from './types'
 
 export interface FaceOptions {
     text?: string
@@ -12,6 +12,7 @@ export interface GenerateOptions {
     bleed: number
     thickness: number
     margin: number
+    style: BoxStyle
     face: {
         front: FaceOptions
         back: FaceOptions
@@ -26,16 +27,6 @@ export interface GetFaceDimensionsOptions {
     size: Size
     thickness: number
     bleed: number
-}
-
-const defaultText = 'Sample'
-const defaultFont: Font = {
-    family: 'Times-Roman',
-    size: 14,
-    weight: 700,
-    color: { r: 0, g: 0, b: 0 },
-    outlineColor: { r: 255, g: 255, b: 255 },
-    outlineWidth: 0
 }
 
 export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions): [number, number] {
@@ -109,17 +100,31 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.lineTo(back.x + back.width, back.y + back.height)
 
         // back (bottom)
-        ctx.lineTo(back.x + back.width, back.y + back.height + size.depth * 0.8)
-        ctx.lineTo(back.x, back.y + back.height + size.depth * 0.8)
+        if (options.style == 'double-tuck') {
+            ctx.lineTo(back.x, back.y + back.height)
+        }
+        else {
+            ctx.lineTo(back.x + back.width, back.y + back.height + size.depth * 0.8)
+            ctx.lineTo(back.x, back.y + back.height + size.depth * 0.8)
+        }
 
         // left (bottom)
         ctx.lineTo(back.x, back.y + back.height + size.depth * 0.6)
         ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
         // inner bottom
-        ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
-        ctx.lineTo(front.x, front.y + front.height + size.depth)
-        ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
+        if (options.style == 'double-tuck') {
+            //ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
+            ctx.arc(front.x + front.width - front.width * 0.2, front.y + front.height + size.depth, front.width * 0.2, 0, Math.PI * 0.5)
+            ctx.arc(front.x + front.width * 0.2, front.y + front.height + size.depth, front.width * 0.2, Math.PI * 0.5, Math.PI)
+            //ctx.arc(front.x + front.width * 0.8, front.y + front.height + size.depth, front.width * 0.2, Math.PI, Math.PI * 1.5)
+            ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
+        }
+        else {
+            ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
+            ctx.lineTo(front.x, front.y + front.height + size.depth)
+            ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
+        }
         
         // right
         ctx.lineTo(front.x - size.depth, front.y + front.height + size.depth * 0.6)
@@ -144,6 +149,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.moveTo(front.x, front.y + front.height)
         ctx.lineTo(front.x, front.y + front.height + size.depth * 0.6)
 
+        if (options.style == 'double-tuck') {
+            ctx.moveTo(front.x, front.y + front.height + size.depth)
+            ctx.lineTo(front.x + front.width * 0.1, front.y + front.height + size.depth)
+
+            ctx.moveTo(front.x + front.width * 0.9, front.y + front.height + size.depth)
+            ctx.lineTo(front.x + front.width, front.y + front.height + size.depth)
+        }
+
         ctx.moveTo(front.x + front.width, front.y + front.height)
         ctx.lineTo(front.x + front.width, front.y + front.height + size.depth * 0.6)
 
@@ -155,6 +168,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // inner bottom
         ctx.moveTo(front.x, front.y + front.height)
         ctx.lineTo(front.x + front.width, front.y + front.height)
+
     
         // right
         ctx.moveTo(front.x - size.depth, front.y)
@@ -172,13 +186,20 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // back
         ctx.moveTo(back.x + back.width, back.y)
         ctx.lineTo(back.x + back.width, back.y + back.height)
-        ctx.lineTo(back.x, back.y + back.height)
+        if (options.style != 'double-tuck')
+            ctx.lineTo(back.x, back.y + back.height)
     
         // top
         ctx.moveTo(front.x, front.y)
         ctx.lineTo(front.x + front.width, front.y)
         ctx.moveTo(front.x + front.width * 0.1, front.y - size.depth)
         ctx.lineTo(front.x + front.width * 0.9, front.y - size.depth)
+
+        if (options.style == 'double-tuck') {
+            // bottom
+            ctx.moveTo(front.x + front.width * 0.1, front.y + front.height + size.depth)
+            ctx.lineTo(front.x + front.width * 0.9, front.y + front.height + size.depth)
+        }
     }
 
     const wrapText = (text: string, w: number, lineHeight: number, cb: (t: string, y: number) => void) => {

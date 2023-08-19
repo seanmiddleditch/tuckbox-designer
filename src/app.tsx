@@ -15,7 +15,7 @@ import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
 import { Checkbox, FormControlLabel, FormGroup, Typography } from '@suid/material'
 import { Download as DownloadIcon } from '@suid/icons-material'
-import { Font, Size, Face, RGB, Faces, CropData } from './types'
+import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
 
@@ -28,6 +28,7 @@ interface Config {
         title: string
         color: RGB
         font: Font
+        style: BoxStyle
     }
     view: {
         advanced: boolean
@@ -81,6 +82,7 @@ const defualtConfig: Config = {
         title: 'Sample',
         color: { r: 255, g: 255, b: 255 },
         font: defaultFont,
+        style: 'default',
     },
     view: {
         advanced: false,
@@ -281,6 +283,7 @@ export const App = () => {
 
         generate(ctx, {
             size,
+            style: config.style.style,
             color: config.style.color,
             bleed: toPt(config.bleed),
             thickness: toPt(config.thickness),
@@ -438,6 +441,11 @@ export const App = () => {
                         <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
                         <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
                     </VStack>
+                    <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
+                        <Select.Item value='default'>Default</Select.Item>
+                        <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
+                    </Select>
+                    <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
                     <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
                     <HStack alignItems='baseline'>
                         <h2>Faces</h2>

@@ -1,4 +1,6 @@
-export as namespace types;
+export as namespace types
+
+export type BoxStyle = 'default' | 'double-tuck'
 
 export interface RGB {
     r: number
