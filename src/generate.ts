@@ -483,10 +483,4 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
     }
     ctx.restore()
-
-    // ctx.strokeStyle = '#ff0000'
-    // ctx.strokeRect(front.x + options.bleed, front.y + options.bleed, front.width - options.bleed * 2, front.height - options.bleed * 2)
-
-    // ctx.strokeStyle = '#00ff00'
-    // ctx.strokeRect(front.x + options.thickness, front.y + options.thickness, options.size.width, options.size.height)
 }

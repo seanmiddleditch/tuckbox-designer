@@ -21,6 +21,7 @@ import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
 import { HelpButton } from './components/help-button'
+import { colorToRgb } from './color'
 
 interface Config {
     units: Units
@@ -73,7 +74,9 @@ const defaultFace: Face = {
     font: defaultFont,
     useTitle: true,
     useDefaultFont: true,
-    crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 }
+    crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
+    feather: 0,
+    opacity: 1.0,
 }
 
 const defualtConfig: Config = {
@@ -127,15 +130,19 @@ const getOppositeFace = (face: Faces) => {
     }
 }
 
-const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RGB): Promise<HTMLCanvasElement> => {
+interface LoadImageOptions {
+    color: RGB
+    feather: number
+    opacity: number
+}
+
+const loadImage = (blob: Blob, crop: CropData, dims: [number, number], options: LoadImageOptions): Promise<HTMLCanvasElement> => {
     const img = new Image()
     const url = URL.createObjectURL(blob)
     const promise = new Promise<HTMLCanvasElement>((resolve, reject) => {
         img.onload = () => {
             document.body.appendChild(img)
 
-            // we fill in the background with our box color
-            // due to https://github.com/parallax/jsPDF/issues/816
             const cropper = new Cropper(img, {
                 data: crop,
                 background: false,
@@ -143,9 +150,8 @@ const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RG
                     const canvas = cropper.getCroppedCanvas({
                         width: dims[0] || 400,
                         height: dims[1] || 300,
-                        fillColor: `rgb(${color.r}, ${color.g}, ${color.b})`,
                         imageSmoothingEnabled: true,
-                        imageSmoothingQuality: 'high'
+                        imageSmoothingQuality: 'high',
                     })
                     cropper.destroy()
                     document.body.removeChild(img)
@@ -155,7 +161,47 @@ const loadImage = (blob: Blob, crop: CropData, dims: [number, number], color: RG
         }
         img.onerror = reject
     })
-    .finally(() => URL.revokeObjectURL(url))
+        .finally(() => URL.revokeObjectURL(url))
+        .then(cropped => {
+            const f = options.feather
+            if (f <= 0)
+                return cropped
+
+            const canvas = document.createElement('canvas')
+            canvas.width = cropped.width
+            canvas.height = cropped.height
+            const ctx = canvas.getContext('2d')
+            if (!ctx) throw 'Failed to create canvas context'
+
+            // feather edges
+            ctx.shadowOffsetX = canvas.width
+            ctx.shadowBlur = f
+            ctx.shadowColor = '#0f0'
+            ctx.fillRect(-canvas.width + f, f, canvas.width - f * 2, canvas.height - f * 2)
+            
+            ctx.shadowBlur = 0
+            ctx.globalCompositeOperation = 'source-in'
+            ctx.drawImage(cropped, 0, 0)
+
+            return canvas
+        })
+        .then(image => {
+            const canvas = document.createElement('canvas')
+            canvas.width = image.width
+            canvas.height = image.height
+            const ctx = canvas.getContext('2d')
+            if (!ctx) throw 'Failed to create canvas context'
+
+            // we fill in the background with our box color
+            // due to https://github.com/parallax/jsPDF/issues/816
+            ctx.fillStyle = colorToRgb(options.color)
+            ctx.fillRect(0, 0, canvas.width, canvas.height)
+
+            ctx.globalAlpha = options.opacity
+
+            ctx.drawImage(image, 0, 0)
+            return canvas
+        })
     img.src = url
     return promise
 }
@@ -236,8 +282,14 @@ export const App = () => {
             if (blob && config.face[face].crop) {
                 // we need to read the properties themselves to be reactive
                 const { x, y, width, height, scaleX, scaleY, rotate } = config.face[face].crop
+                const options = {
+                    color: { ...config.style.color },
+                    feather: +config.face[face].feather,
+                    opacity: +config.face[face].opacity,
+                }
 
-                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), config.style.color).then(canvas => setImageCache(face, canvas))
+                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), options)
+                    .then(canvas => setImageCache(face, canvas))
             } else {
                 setImageCache(face, undefined)
             }
@@ -457,16 +509,16 @@ export const App = () => {
                     </HStack>
                     <Show when={config.view.advanced}>
                         <HStack>
-                            <NumberInput id='bleed' label='Bleed' units={config.units} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
-                            <NumberInput id='margin' label='Margin' units={config.units} value={config.margin} onChange={margin => setConfig({ margin })} />
-                            <NumberInput id='thickness' label='Thickness' units={config.units} value={config.thickness} onChange={thickness => setConfig({ thickness })} />
+                            <NumberInput id='bleed' label='Bleed' units={config.units} min={0} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                            <NumberInput id='margin' label='Margin' units={config.units} min={0} value={config.margin} onChange={margin => setConfig({ margin })} />
+                            <NumberInput id='thickness' label='Thickness' units={config.units} min={0} value={config.thickness} onChange={thickness => setConfig({ thickness })} />
                         </HStack>
                     </Show>
                     <Typography variant='h6'>Deck Size</Typography>
                     <HStack>
-                        <NumberInput id="width" value={config.size.width} units={config.units} onChange={value => setConfig('size', 'width', value)} label='Width' />
-                        <NumberInput id="height" value={config.size.height} units={config.units} onChange={value => setConfig('size', 'height', value)} label='Height' />
-                        <NumberInput id="depth" value={config.size.depth} units={config.units} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
+                        <NumberInput id="width" value={config.size.width} units={config.units} min={0} onChange={value => setConfig('size', 'width', value)} label='Width' />
+                        <NumberInput id="height" value={config.size.height} units={config.units} min={0} onChange={value => setConfig('size', 'height', value)} label='Height' />
+                        <NumberInput id="depth" value={config.size.depth} units={config.units} min={0} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                     </HStack>
                     <Typography variant='h6'>Styling</Typography>
                     <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
@@ -513,9 +565,11 @@ export const App = () => {
                                         </HelpButton>
                                     </HStack>
                                     <TextInput id={`face-${face}-text`} label='Label' disabled={!!config.face[face].useTitle} sx={{ width: '100%' }} value={config.face[face].text} onChange={text => setConfig('face', face, { text })} />
+                                    <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                     <HStack>
-                                        <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                         <ImageSelect id={`face-${face}-image`} disabled={canUseOppositeImage(face) && config.face[face].useOppositeImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
+                                        <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || (canUseOppositeImage(face) && config.face[face].useOppositeImage)} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
+                                        <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || (canUseOppositeImage(face) && config.face[face].useOppositeImage)} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })}/>
                                     </HStack>
                                 </VStack>
                             </Match>}

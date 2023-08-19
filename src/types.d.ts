@@ -44,4 +44,6 @@ export interface Face {
     useDefaultFont?: boolean
     useOppositeImage?: boolean
     crop: CropData
+    feather: number
+    opacity: number
 }

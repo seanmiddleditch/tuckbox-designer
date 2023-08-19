@@ -1,4 +1,4 @@
-import { Component, createSignal } from 'solid-js'
+import { Component, batch, createSignal } from 'solid-js'
 import { TextField, InputAdornment } from '@suid/material'
 
 type NumberInputProps = {
@@ -6,6 +6,9 @@ type NumberInputProps = {
     value: number
     disabled?: boolean
     integer?: boolean
+    step?: number
+    min?: number
+    max?: number
     label: string
     units?: string
 } & ({
@@ -15,38 +18,63 @@ type NumberInputProps = {
     onChange?: (value: number) => void
 })
 
-const isNumeric = (text: string) => /^[0-9]*([.][0-9]*)?$/.test(text)
+const isNumeric = (text: string) => /^-?[0-9]*([.][0-9]*)?$/.test(text)
+const isInteger = (text: string) => /^-?[0-9]*$/.test(text)
+const isNegative = (text: string) => /^-/.test(text)
 
 export const NumberInput: Component<NumberInputProps> = (props) => {
-    const [value, setValue] = createSignal<string|undefined>(undefined)
+    const [value, setValue] = createSignal<string | undefined>(undefined)
+    const [valid, setValid] = createSignal(true)
+
+    const update = (input: string, value: number, isValid: boolean) => {
+
+    }
 
     const onChange = (e: Event) => {
         const input = e.target as HTMLInputElement
         const newValue = input.value
-
+        
+        // ignore any invalid input characters or formats
         if (!isNumeric(newValue))
             return
 
-        const newNumber = Number.parseFloat(newValue)
-        const isValid = newValue !== '' && !Number.isNaN(newNumber)
+        if (props.integer && !isInteger(newValue))
+            return
 
-        setValue(newValue)
+        if (props.min !== undefined && props.min >= 0 && isNegative(newValue))
+            return
+
+        // parse and validate the input
+        const newNumber = Number.parseFloat(newValue)
+
+        const isNumber = newValue !== '' && !Number.isNaN(newNumber)
+        const isInRange =
+            (props.min === undefined || props.min <= newNumber) &&
+            (props.max === undefined || props.max >= newNumber) &&
+            (!props.integer || Number.isInteger(newNumber))
+        const isValid = isNumber && isInRange
+
+        batch(() => {
+            setValue(newValue)
+            setValid(isValid)
+        })
+
         if (isValid && props.onChange)
             props.onChange(newNumber)
     }
 
     const onBlur = () => {
         setValue(undefined)
+        setValid(true)
     }
 
-    return <TextField id={props.id} size='small' variant='outlined' sx={{ width: '14ch' }}
-        value={props.disabled ? props.value : (value() ?? props.value)}
+    return <TextField id={props.id} size='small' error={!valid()} variant='outlined' sx={{ width: '14ch' }}
+        value={props.disabled ? props.value : `${value() ?? props.value}`}
         disabled={props.disabled}
         label={props.label}
-        type={props.integer ? 'number' : 'text'}
+        inputProps={{ step: props.step, min: props.min, max: props.max }}
         onChange={e => onChange(e)}
         onBlur={_ => onBlur()}
-        InputProps={{
-            endAdornment: props.units ? <InputAdornment position='end'>{props.units}</InputAdornment> : undefined,
-        }} />
+        helperText={(!valid() && !isNaN(Number.parseFloat(value() ?? ''))) ? `${props.min ?? '-∞'} to ${props.max ?? '∞'}` : undefined}
+        InputProps={{ endAdornment: props.units ? <InputAdornment position='end'>{props.units}</InputAdornment> : undefined }} />
 }

@@ -3,7 +3,7 @@ import { Component, batch } from 'solid-js'
 import { createSignal } from 'solid-js'
 import { ChromePicker } from 'solid-color'
 import { RGB } from '../types'
-import { colorToString } from '../color'
+import { colorToHex } from '../color'
 
 interface ColorButtonsProps {
     color: RGB,
@@ -26,8 +26,8 @@ const ColorButton: Component<ColorButtonsProps> = props => <Button onClick={prop
             'border-radius': 'inherit',
             'width': '100%',
             'height': '100%',
-            'background-color': colorToString(props.color),
-            'border-color': colorToString(props.color),
+            'background-color': colorToHex(props.color),
+            'border-color': colorToHex(props.color),
             'border-width': '2px',
             'border-style': 'solid',
             'position': 'relative',
@@ -66,7 +66,7 @@ export const ColorPicker: Component<ColorPickerProps> = props => {
     return <>
         <FormControl size='small' variant='outlined' style='width: 17ch'>
             <InputLabel for={props.id} variant='outlined' filled>{props.label}</InputLabel>
-            <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={colorToString(props.color)} endAdornment={button()} />
+            <OutlinedInput id={props.id} readOnly onClick={onClick} disabled={props.disabled} label={props.label} value={colorToHex(props.color)} endAdornment={button()} />
         </FormControl>
         <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={isColorOpen()} onClose={onClose}>
             <ChromePicker color={props.color} disableAlpha onChange={color => props.onChange(color.rgb) } />

@@ -1,12 +1,11 @@
-import { Box, Button, FormControl, InputAdornment, InputLabel, OutlinedInput, Popover } from '@suid/material'
+import { Box, FormControl, InputAdornment, InputLabel, OutlinedInput, Popover } from '@suid/material'
 import { Font, RGB } from '../types'
 import { ColorPicker } from './color-picker'
 import { NumberInput } from './number-input'
 import { Select } from './select'
 import { HStack, VStack } from './stack'
 import { Component, createSignal } from 'solid-js'
-import { colorToString } from '../color'
-import { HelpButton } from './help-button'
+import { colorToHex } from '../color'
 
 interface FontSelectorProps {
     id: string
@@ -37,11 +36,11 @@ const FontColor: Component<FontColorProps> = props =>
             'box-sizing': 'border-box',
             'width': '100%',
             'height': '100%',
-            'background-color': colorToString(props.color),
+            'background-color': colorToHex(props.color),
             'background-position': '0 0, 3px 3px',
             'background-size': '8px 8px',
             'border-style': 'solid',
-            'border-color': colorToString(props.outlineColor),
+            'border-color': colorToHex(props.outlineColor),
             'border-width': `${props.outlineWidth}px`,
             'border-radius': 'inherit',
         }}></div>
@@ -65,18 +64,18 @@ export const FontSelector = (props: FontSelectorProps) => {
         <Popover anchorEl={anchor()} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} open={isOpen()} onClose={onClose}>
             <Box sx={{ border: 1, p: 3, bgcolor: 'background.paper' }}>
                 <VStack>
-                    <HStack alignItems='center'>
+                    <HStack>
                         <Select id={`${props.id}-font-family`} label='Font Family' disabled={props.disabled} value={props.value.family} onChange={family => props.onChange({ family })}>
                             <Select.Item value='Courier'>Courier</Select.Item>
                             <Select.Item value='Helvetica'>Helvetica</Select.Item>
                             <Select.Item value='Times-Roman'>Times Roman</Select.Item>
                         </Select>
-                        <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer disabled={props.disabled} value={props.value.size} onChange={size => props.onChange({ size })} />
-                        <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.disabled} value={props.value.weight} onChange={weight => props.onChange({ weight })} />
+                        <NumberInput id={`${props.id}-font-size`} label='Font Size' units='pt' integer min={6} max={72} disabled={props.disabled} value={props.value.size} onChange={size => props.onChange({ size })} />
+                        <NumberInput id={`${props.id}-font-weight`} label='Font Weight' disabled={props.disabled} integer step={100} min={100} max={900} value={props.value.weight} onChange={weight => props.onChange({ weight })} />
                     </HStack>
                     <HStack>
                         <ColorPicker id={`${props.id}-font-color`} label='Font Color' disabled={props.disabled} color={props.value.color} onChange={color => props.onChange({ color })} />
-                        <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' units='px' disabled={props.disabled} value={props.value.outlineWidth} onChange={outlineWidth => props.onChange({ outlineWidth })} />
+                        <NumberInput id={`${props.id}-font-outline-width`} label='Outline Width' units='px' integer min={0} max={10} disabled={props.disabled} value={props.value.outlineWidth} onChange={outlineWidth => props.onChange({ outlineWidth })} />
                         <ColorPicker id={`${props.id}-font-outline-color`} label='Outline Color' disabled={props.disabled} color={props.value.outlineColor} onChange={outlineColor => props.onChange({ outlineColor })} />
                     </HStack>
                 </VStack>
