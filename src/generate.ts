@@ -1,5 +1,6 @@
 import { Size, Font, RGB, Faces, BoxStyle } from './types'
 import { luminosity } from './color'
+import { PaperSize } from './paper'
 
 export interface FaceOptions {
     text?: string
@@ -9,7 +10,7 @@ export interface FaceOptions {
 
 export interface GenerateOptions {
     size: Size
-    pageSize: [number, number]
+    pageSize: PaperSize
     color: RGB
     bleed: number
     thickness: number
@@ -489,7 +490,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.beginPath()
         ctx.textAlign = 'left'
         
-        writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize[0] - back.x - options.margin)
+        writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize.width - back.x - options.margin)
 
         ctx.restore()
     }

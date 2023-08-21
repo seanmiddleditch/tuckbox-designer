@@ -1,6 +1,6 @@
 import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal, For } from 'solid-js'
 import { createStore } from 'solid-js/store'
-import { paperSize, PaperFormats } from './paper'
+import { paperSize, PaperFormats, getPaperSizes, getPaperSize } from './paper'
 import { convert, Units } from './convert'
 import { FaceOptions, generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
@@ -393,8 +393,8 @@ export const App = () => {
 
             const toolbarHeight = 20 // guess at toolbar height for browser PDF viewers
             
-            preview.width = `${convert(pageSize[0], config.units, 'px')}px`
-            preview.height = `${convert(pageSize[1], config.units, 'px') + toolbarHeight}px` 
+            preview.width = `${convert(pageSize.width, pageSize.units, 'px')}px`
+            preview.height = `${convert(pageSize.height, pageSize.units, 'px') + toolbarHeight}px` 
 
             const { url } = generatePdfBlob()
             preview.data = url
@@ -404,8 +404,8 @@ export const App = () => {
             if (!canvas)
                 return
 
-            canvas.width = convert(pageSize[0], config.units, 'pt')
-            canvas.height = convert(pageSize[1], config.units, 'pt')
+            canvas.width = convert(pageSize.width, config.units, 'pt')
+            canvas.height = convert(pageSize.height, config.units, 'pt')
 
             const ctx = canvas.getContext("2d")!
             ctx.clearRect(0, 0, canvas.width, canvas.height)
@@ -506,15 +506,18 @@ export const App = () => {
                         </FormGroup>
                     </HStack>
                     <HStack>
-                        <Select id='page-size' label='Page Format' value={config.page} onChange={value => setConfig('page', value as PaperFormats)}>
-                            <Select.Item value='letter'>US Letter</Select.Item>
-                            <Select.Item value='a4'>A4</Select.Item>
+                        <Select id='page-size' label='Page Format' value={config.page} renderValue={value => getPaperSize(value).name} onChange={format => setConfig('page', format)}>
+                            <For each={getPaperSizes()}>{paper =>
+                                <Select.Item value={paper.format} style='width: 220px; text-align: baseline' note={<>{paper.width}x{paper.height}{paper.units}</>}>
+                                    {paper.name}
+                                </Select.Item>
+                            }</For>
                         </Select>
                         <Select id='page-size' label='Units' value={config.units} onChange={value => changeUnits(value)}>
-                            <Select.Item value='cm'>centimeters</Select.Item>
-                            <Select.Item value='mm'>millimeters</Select.Item>
-                            <Select.Item value='in'>inches</Select.Item>
-                            <Select.Item value='pt'>points</Select.Item>
+                            <Select.Item value='cm'>Centimeters</Select.Item>
+                            <Select.Item value='mm'>Millimeters</Select.Item>
+                            <Select.Item value='in'>Inches</Select.Item>
+                            <Select.Item value='pt'>Points</Select.Item>
                         </Select>
                     </HStack>
                     <Show when={config.view.advanced}>
