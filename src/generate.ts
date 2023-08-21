@@ -8,6 +8,9 @@ export interface FaceOptions {
     image?: HTMLCanvasElement
 }
 
+export type GenerateMode = 'standard' | 'pretty' | 'two-sided'
+export type GenerateSide = 'front' | 'back'
+
 export interface GenerateOptions {
     size: Size
     pageSize: PaperSize
@@ -16,7 +19,8 @@ export interface GenerateOptions {
     thickness: number
     margin: number
     style: BoxStyle
-    prettyPreview: boolean
+    mode?: GenerateMode
+    side?: GenerateSide
     face: {
         front: FaceOptions
         back: FaceOptions
@@ -54,6 +58,9 @@ export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions
 }
 
 export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions) {
+    const mode = options.mode ?? 'standard'
+    const side = options.side ?? 'front'
+
     // expand size to account for paper thickness
     const size = {
         width: options.size.width + options.thickness * 2,
@@ -81,7 +88,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         }
     }
 
-    const bgLuminosity = luminosity(options.color)
+    const bgLuminosity = side == 'front' ? luminosity(options.color) : 1
     const cutColor = bgLuminosity < .7 ? '#fff' : '#000'
     const scoreColor = bgLuminosity < .7 ? '#eee' : '#111'
     const innerColor = '#ccc'
@@ -99,7 +106,12 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     instructions += 'Fold loosely into shape and check alignment.\n'
     instructions += 'Glue inner side (A). Firmly press together with matching side and hold.\n'
     if (options.style != 'double-tuck')
-        instructions += 'Glue inner side (B). Firmly press together with matching bottom and hold.'
+        instructions += 'Glue inner side (B). Firmly press together with matching bottom and hold.\n'
+    if (side == 'back')
+        instructions += 'Print duplex (short-side).'
+
+    const hasInstructions = mode == 'standard' || (mode == 'two-sided' && side == 'back')
+    const hasDesign = mode != 'two-sided' || side == 'front'
 
     const pathOutline = () => {
         // top
@@ -201,7 +213,6 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         // inner bottom
         ctx.moveTo(front.x, front.y + front.height)
         ctx.lineTo(front.x + front.width, front.y + front.height)
-
     
         // right
         ctx.moveTo(front.x - size.depth, front.y)
@@ -359,7 +370,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     // box color (overlap to handle bleed)
-    if (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1) {
+    if (hasDesign && (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1)) {
         ctx.save()
 
         ctx.setLineDash([])
@@ -370,18 +381,18 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.beginPath()
 
         pathOutline()
-        if (!options.prettyPreview)
+        if (mode != 'pretty')
             ctx.stroke()
         ctx.fill()
         ctx.restore()
     }
     
     // images
-    {
+    if (hasDesign) {
         ctx.save()
 
         // clip in preview mode, mostly for the back face cutout
-        if (options.prettyPreview) {
+        if (mode == 'pretty') {
             ctx.beginPath()
             pathOutline()
             ctx.clip()
@@ -409,7 +420,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
     
     // text labels
-    {
+    if (hasDesign) {
         ctx.save()
         ctx.beginPath()
         ctx.fillStyle = '#000000'
@@ -421,9 +432,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     // stroke outline
-    if (!options.prettyPreview) {
+    if (hasInstructions) {
         ctx.save()
         ctx.beginPath()
+
+        if (side == 'back') {
+            ctx.translate(options.pageSize.width, 0)
+            ctx.scale(-1, 1)
+        }
 
         pathOutline()
 
@@ -436,9 +452,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     // stroke inner cut lines
-    if (!options.prettyPreview) {
+    if (hasInstructions) {
         ctx.save()
         ctx.beginPath()
+
+        if (side == 'back') {
+            ctx.translate(options.pageSize.width, 0)
+            ctx.scale(-1, 1)
+        }
 
         pathCuts()
 
@@ -451,9 +472,14 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     // stroke fold lines
-    if (!options.prettyPreview) {
+    if (hasInstructions) {
         ctx.save()
         ctx.beginPath()
+
+        if (side == 'back') {
+            ctx.translate(options.pageSize.width, 0)
+            ctx.scale(-1, 1)
+        }
 
         pathScores()
 
@@ -473,24 +499,45 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.textAlign = 'center'
         ctx.textBaseline = 'middle'
 
-        ctx.fillRect(back.x + back.width + options.bleed, back.y + options.bleed, size.depth * 0.8 - options.bleed * 2, back.height - options.bleed * 2)
-        writeCenterAngle('Glue Here (A)', instructFont, back.x + back.width + size.depth * 0.4, back.y + back.height * 0.5, Math.PI * 0.5, back.height - options.bleed * 2)
-
-        if (options.style != 'double-tuck') {
-            ctx.fillRect(back.x + options.bleed, back.y + back.height + options.bleed, back.width - options.bleed * 2, size.depth * 0.8 - options.bleed * 2)
-            writeCenterAngle('Glue Here (B)', instructFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.4, Math.PI, back.width - options.bleed * 2)
+        if (side == 'back') {
+            ctx.translate(options.pageSize.width, 0)
+            ctx.scale(-1, 1)
         }
+
+        if (hasDesign) {
+            ctx.fillRect(back.x + back.width + options.bleed, back.y + options.bleed, size.depth * 0.8 - options.bleed * 2, back.height - options.bleed * 2)
+            writeCenterAngle('Glue Here (A)', instructFont, back.x + back.width + size.depth * 0.4, back.y + back.height * 0.5, Math.PI * 0.5, back.height - options.bleed * 2)
+
+            if (options.style != 'double-tuck') {
+                ctx.fillRect(back.x + options.bleed, back.y + back.height + options.bleed, back.width - options.bleed * 2, size.depth * 0.8 - options.bleed * 2)
+                writeCenterAngle('Glue Here (B)', instructFont, back.x + back.width * 0.5, back.y + back.height + size.depth * 0.4, Math.PI, back.width - options.bleed * 2)
+            }
+        }
+
+        if (side == 'back') {
+            ctx.fillRect(front.x - size.depth + options.bleed, front.y + options.bleed, size.depth - options.bleed * 2, front.height - options.bleed * 2)
+            writeCenterAngle('Glue Here (A)', instructFont, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height - options.bleed * 2)
+
+            if (options.style != 'double-tuck') {
+                ctx.fillRect(front.x + options.bleed, front.y + front.height + options.bleed, front.width - options.bleed * 2, size.depth - options.bleed * 2)
+                writeCenterAngle('Glue Here (B)', instructFont, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, front.width - options.bleed * 2)
+            }
+        }
+
 
         ctx.restore()
     }
 
     // instructions
-    if (!options.prettyPreview) {
+    if (hasInstructions) {
         ctx.save()
         ctx.beginPath()
         ctx.textAlign = 'left'
+
+        const x = side == 'back' ? options.margin : back.x + options.bleed * 2
+        const w = side == 'back' ? options.pageSize.width - back.x - options.bleed * 2 : options.pageSize.width - back.x - options.margin
         
-        writeLine(instructions, instructFont, back.x + options.bleed * 2, back.y - size.depth - options.bleed * 3, options.pageSize.width - back.x - options.margin)
+        writeLine(instructions, instructFont, x, back.y - size.depth - options.bleed * 3, w)
 
         ctx.restore()
     }

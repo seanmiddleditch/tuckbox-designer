@@ -2,7 +2,7 @@ import { createEffect, Switch, Match, Show, onCleanup, batch, createSignal, For 
 import { createStore } from 'solid-js/store'
 import { paperSize, PaperFormats, getPaperSizes, getPaperSize } from './paper'
 import { convert, Units } from './convert'
-import { FaceOptions, generate, getFaceDimensions } from './generate'
+import { FaceOptions, GenerateMode, GenerateSide, generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
@@ -15,7 +15,7 @@ import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
 import { FormControlLabel, FormGroup, Typography, Link, Container, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
-import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
+import { BugReportRounded as BugIcon, Check, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
@@ -32,6 +32,7 @@ interface Config {
         color: RGB
         font: Font
         style: BoxStyle
+        twoSided: boolean
     }
     view: {
         advanced: boolean
@@ -91,6 +92,7 @@ const defualtConfig: Config = {
         color: { r: 255, g: 255, b: 255 },
         font: { ...defaultFont },
         style: 'default',
+        twoSided: false,
     },
     view: {
         advanced: false,
@@ -318,7 +320,7 @@ export const App = () => {
         })
     }
 
-    const renderTuckBox = (ctx: CanvasRenderingContext2D) => {
+    const renderTuckBox = (ctx: CanvasRenderingContext2D, options?: { mode?: GenerateMode, side?: GenerateSide }) => {
         const size = {
             width: toPt(config.size.width),
             height: toPt(config.size.height),
@@ -357,7 +359,8 @@ export const App = () => {
             bleed: toPt(config.bleed),
             thickness: toPt(config.thickness),
             margin: toPt(config.margin),
-            prettyPreview: config.view.preview == 'canvas-pretty',
+            mode: options?.mode,
+            side: options?.side,
             face
         })
     }
@@ -371,7 +374,11 @@ export const App = () => {
 
         const ctx = patchJsPdf(doc.canvas.getContext("2d"))
         
-        renderTuckBox(ctx)
+        renderTuckBox(ctx, { mode: config.style.twoSided ? 'two-sided' : 'standard', side: 'front' })
+        if (config.style.twoSided) {
+            doc.addPage(config.page, 'landscape')
+            renderTuckBox(ctx, { mode: 'two-sided', side: 'back' })
+        }
 
         const bytes = doc.output('blob')
         pdfBlob = new Blob([bytes], { type: 'application/pdf' })
@@ -410,7 +417,7 @@ export const App = () => {
             const ctx = canvas.getContext("2d")!
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-            renderTuckBox(ctx)
+            renderTuckBox(ctx, { mode: config.view.preview == 'canvas-pretty' ? 'pretty' : config.style.twoSided ? 'two-sided' : 'standard' })
         }
 
     })
@@ -536,7 +543,6 @@ export const App = () => {
                     <Typography variant='h6'>Styling</Typography>
                     <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
                     <HStack alignItems='center'>
-                        <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })}/>
                         <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
                             <Select.Item value='default'>Default</Select.Item>
                             <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
@@ -545,8 +551,16 @@ export const App = () => {
                             <p>The <b>Default</b> box style requires gluing the bottom box flaps.</p>
                             <p>The <b>Bottom Tuck</b> box style uses a tuck flap on the bottom of the box.</p>
                         </HelpButton>
+                        <Checkbox label='Two -Sided' checked={config.style.twoSided} onChange={twoSided => setConfig('style', { twoSided })} />
+                        <HelpButton>
+                            <p>When <b>Two Sided</b> is checked, cut and score lines will be printed on a second page.</p>
+                            <p>This option is intended for duplex printing and can result in prettier boxes.</p>
+                        </HelpButton>
                     </HStack>
-                    <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
+                    <HStack alignItems='center'>
+                        <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })} />
+                        <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
+                    </HStack>
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Faces</Typography>
                         <Select id='current-face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
