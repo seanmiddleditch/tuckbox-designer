@@ -7,6 +7,7 @@ interface TextInputProps {
     label: string
     placeholder?: string
     disabled?: boolean
+    multiline?: boolean
     sx: {}
     onChange: (value: string) => void
 }
@@ -14,6 +15,7 @@ interface TextInputProps {
 export const TextInput: Component<TextInputProps> = (props) => 
     <TextField id={props.id} size='small' variant='outlined' sx={props.sx ?? { width: '14ch' }}
         disabled={props.disabled}
+        multiline={props.multiline}
         placeholder={props.placeholder}
         value={props.value}
         label={props.label}

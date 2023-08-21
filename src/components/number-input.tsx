@@ -68,7 +68,7 @@ export const NumberInput: Component<NumberInputProps> = (props) => {
         setValid(true)
     }
 
-    return <TextField id={props.id} size='small' error={!valid()} variant='outlined' sx={{ width: '14ch' }}
+    return <TextField id={props.id} size='small' error={!valid()} variant='outlined' sx={{ width: '12ch' }}
         value={props.disabled ? props.value : `${value() ?? props.value}`}
         disabled={props.disabled}
         label={props.label}

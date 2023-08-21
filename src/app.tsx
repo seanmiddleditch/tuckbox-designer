@@ -4,6 +4,7 @@ import { paperSize, PaperFormats, getPaperSizes, getPaperSize } from './paper'
 import { convert, Units } from './convert'
 import { FaceOptions, GenerateMode, GenerateSide, generate, getFaceDimensions } from './generate'
 import { createLocalStore } from './local'
+import { colorToRgb } from './color'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
 import { HStack, VStack } from './components/stack'
@@ -14,15 +15,13 @@ import { NumberInput } from './components/number-input'
 import { TextInput } from './components/text-input'
 import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
-import { FormControlLabel, FormGroup, Typography, Link, Container, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
-import { BugReportRounded as BugIcon, Check, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
+import { Typography, Link, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
+import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
 import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
 import Cropper from 'cropperjs'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
-import { HelpButton } from './components/help-button'
-import { colorToRgb } from './color'
 
 interface Config {
     units: Units
@@ -30,12 +29,10 @@ interface Config {
     style: {
         title: string
         color: RGB
-        font: Font
         style: BoxStyle
         twoSided: boolean
     }
     view: {
-        advanced: boolean
         preview: 'canvas' | 'canvas-pretty' | 'pdf'
         face: Faces
     }
@@ -49,6 +46,7 @@ interface Config {
     }
     size: Size
     bleed: number
+    safeArea: number
     margin: number
     thickness: number
 }
@@ -73,10 +71,8 @@ const defaultFont: Font = {
 
 const defaultFace: Face = {
     label: '',
-    font: defaultFont,
+    font: { ...defaultFont },
     useLabel: true,
-    useDefaultFont: true,
-    useOppositeImage: true,
     useImage: false,
     cloneOpposite: false,
     crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
@@ -90,12 +86,10 @@ const defualtConfig: Config = {
     style: {
         title: 'Sample',
         color: { r: 255, g: 255, b: 255 },
-        font: { ...defaultFont },
         style: 'default',
         twoSided: false,
     },
     view: {
-        advanced: false,
         preview: 'canvas',
         face: 'front',
     },
@@ -113,6 +107,7 @@ const defualtConfig: Config = {
         depth: 1.0
     },
     bleed: 0.12,
+    safeArea: 0.12,
     margin: 0.25,
     thickness: 0.02
 }
@@ -135,6 +130,8 @@ const getOppositeFace = (face: Faces) => {
         case 'right': return 'left'
     }
 }
+
+const titlecase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
 interface LoadImageOptions {
     color: RGB
@@ -233,7 +230,7 @@ export const App = () => {
             height: config.size.height,
             depth: config.size.depth,
         }
-        const dims = getFaceDimensions(face, { size, thickness: config.thickness, bleed: config.bleed })
+        const dims = getFaceDimensions(face, { size, thickness: config.thickness, safe: config.safeArea })
         return [convert(dims[0], config.units, 'px'), convert(dims[1], config.units, 'px')]
     }
 
@@ -313,6 +310,7 @@ export const App = () => {
                     depth: cv(store.size.depth),
                 },
                 bleed: cv(store.bleed),
+                safe: cv(store.safeArea),
                 margin: cv(store.margin),
                 thickness: cv(store.thickness),
                 units
@@ -337,7 +335,7 @@ export const App = () => {
             return {
                 ...config.face[face],
                 text: config.face[face].useLabel ? (config.face[face].label !== '' ? config.face[face].label : config.style.title) : undefined,
-                font: config.face[face].useDefaultFont ? config.style.font : config.face[face].font,
+                font: config.face[face].font,
                 image: config.face[face].useImage ? ((imageCache[face] || !canClone) ? imageCache[face] : imageCache[opposite]) : undefined,
             }
         }
@@ -357,6 +355,7 @@ export const App = () => {
             style: config.style.style,
             color: config.style.color,
             bleed: toPt(config.bleed),
+            safe: toPt(config.safeArea),
             thickness: toPt(config.thickness),
             margin: toPt(config.margin),
             mode: options?.mode,
@@ -506,13 +505,8 @@ export const App = () => {
             </HStack>
             <HStack spacing={8} width='100%' height='100%'>
                 <VStack>
+                    <Typography variant='h6'>Page &amp; Paper</Typography>
                     <HStack alignItems='center'>
-                        <Typography variant='h6'>Page &amp; Print</Typography>
-                        <FormGroup>
-                            <Checkbox label='Advanced' checked={config.view.advanced} onChange={advanced => setConfig('view', { advanced })} />
-                        </FormGroup>
-                    </HStack>
-                    <HStack>
                         <Select id='page-size' label='Page Format' value={config.page} renderValue={value => getPaperSize(value).name} onChange={format => setConfig('page', format)}>
                             <For each={getPaperSizes()}>{paper =>
                                 <Select.Item value={paper.format} style='width: 220px; text-align: baseline' note={<>{paper.width}x{paper.height}{paper.units}</>}>
@@ -526,43 +520,31 @@ export const App = () => {
                             <Select.Item value='in'>Inches</Select.Item>
                             <Select.Item value='pt'>Points</Select.Item>
                         </Select>
+                        <Checkbox label='Two-Sided' checked={config.style.twoSided} onChange={twoSided => setConfig('style', { twoSided })} />
                     </HStack>
-                    <Show when={config.view.advanced}>
-                        <HStack>
-                            <NumberInput id='bleed' label='Bleed' units={config.units} min={0} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
-                            <NumberInput id='margin' label='Margin' units={config.units} min={0} value={config.margin} onChange={margin => setConfig({ margin })} />
-                            <NumberInput id='thickness' label='Thickness' units={config.units} min={0} value={config.thickness} onChange={thickness => setConfig({ thickness })} />
-                        </HStack>
-                    </Show>
+                    <HStack alignItems='center'>
+                        <NumberInput id='bleed' label='Bleed' units={config.units} min={0} value={config.bleed} onChange={bleed => setConfig({ bleed })} />
+                        <NumberInput id='safe-area' label='Safe Area' units={config.units} min={0} value={config.safeArea} onChange={safeArea => setConfig({ safeArea })} />
+                        <NumberInput id='margin' label='Margin' units={config.units} min={0} value={config.margin} onChange={margin => setConfig({ margin })} />
+                        <NumberInput id='thickness' label='Thickness' units={config.units} min={0} value={config.thickness} onChange={thickness => setConfig({ thickness })} />
+                    </HStack>
                     <Typography variant='h6'>Deck Size</Typography>
                     <HStack>
                         <NumberInput id="width" value={config.size.width} units={config.units} min={0} onChange={value => setConfig('size', 'width', value)} label='Width' />
                         <NumberInput id="height" value={config.size.height} units={config.units} min={0} onChange={value => setConfig('size', 'height', value)} label='Height' />
                         <NumberInput id="depth" value={config.size.depth} units={config.units} min={0} onChange={value => setConfig('size', 'depth', value)} label='Depth' />
                     </HStack>
-                    <Typography variant='h6'>Styling</Typography>
+                    <Typography variant='h6'>Box Styling</Typography>
                     <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
                     <HStack alignItems='center'>
-                        <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
-                            <Select.Item value='default'>Default</Select.Item>
-                            <Select.Item value='double-tuck'>Bottom Tuck</Select.Item>
-                        </Select>
-                        <HelpButton>
-                            <p>The <b>Default</b> box style requires gluing the bottom box flaps.</p>
-                            <p>The <b>Bottom Tuck</b> box style uses a tuck flap on the bottom of the box.</p>
-                        </HelpButton>
-                        <Checkbox label='Two -Sided' checked={config.style.twoSided} onChange={twoSided => setConfig('style', { twoSided })} />
-                        <HelpButton>
-                            <p>When <b>Two Sided</b> is checked, cut and score lines will be printed on a second page.</p>
-                            <p>This option is intended for duplex printing and can result in prettier boxes.</p>
-                        </HelpButton>
-                    </HStack>
-                    <HStack alignItems='center'>
                         <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })} />
-                        <FontSelector id='default-font' label='Default Font' value={config.style.font} onChange={font => setConfig('style', 'font', font)} />
+                        <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
+                            <Select.Item value='default'>Glued Bottom</Select.Item>
+                            <Select.Item value='double-tuck'>Tucked Bottom</Select.Item>
+                        </Select>
                     </HStack>
                     <HStack alignItems='center'>
-                        <Typography variant='h6'>Faces</Typography>
+                        <Typography variant='h6'>Face Styling</Typography>
                         <Select id='current-face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
                             <Select.Item value='front'>Front</Select.Item>
                             <Select.Item value='back'>Back</Select.Item>
@@ -572,35 +554,31 @@ export const App = () => {
                             <Select.Item value='right'>Right</Select.Item>
                         </Select>
                         <Show when={canCloneOpposite(config.view.face)}>
-                            <Checkbox label={`Clone ${getOppositeFace(config.view.face)}`} checked={config.face[config.view.face].cloneOpposite ?? false} onChange={cloneOpposite => setConfig('face', config.view.face, { cloneOpposite })} />
-                            <HelpButton>
-                                <p>When <b>Clone {getOppositeFace(config.view.face)}</b> is checked, all elements of the <i>{getOppositeFace(config.view.face)}</i> face will be used for this face.</p>
-                            </HelpButton>
+                            <Checkbox
+                                label={`Clone ${titlecase(getOppositeFace(config.view.face))} Face`}
+                                checked={config.face[config.view.face].cloneOpposite ?? false}
+                                onChange={cloneOpposite => setConfig('face', config.view.face, { cloneOpposite })} />
                         </Show>
                     </HStack>
                     <Switch>
                         <For each={faces}>
                             {face => <Match when={config.view.face == face}>
-                                <VStack>
-                                    <HStack alignItems='center'>
-                                        <Typography variant='button'>Use...</Typography>
-                                        <Checkbox label='Label' checked={config.face[face].useLabel} onChange={useLabel => setConfig('face', face, { useLabel })} />
-                                        <Checkbox label='Font' disabled={!config.face[face].useLabel} checked={!config.face[face].useDefaultFont} onChange={checked => setConfig('face', face, { useDefaultFont: !checked })} />
-                                        <Checkbox label='Image' checked={config.face[face].useImage} onChange={useImage => setConfig('face', face, { useImage })} />
-                                        <HelpButton>
-                                            <p>When <b>Label</b> is checked, this face will have a label. If no label text is provided, deck title <i>{config.style.title}</i> will be used.</p>
-                                            <p>When <b>Font</b> is checked, this face's label will use the selected font styling. Otherwise, the deck's default font will be used.</p>
-                                            <p>When <b>Image</b> is checked, this face may use the selected image file. <Show when={canCloneOpposite(face)}>If no image is selected, the <i>{getOppositeFace(face)}</i> image will be used.</Show></p>
-                                        </HelpButton>
-                                    </HStack>
-                                    <TextInput id={`face-${face}-text`} label='Label' disabled={!config.face[face].useLabel} sx={{ width: '100%' }} placeholder={config.style.title} value={config.face[face].label} onChange={text => setConfig('face', face, { label: text })} />
-                                    <FontSelector id={`face-${face}-font`} label='Font' disabled={config.face[face].useDefaultFont} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
-                                    <HStack>
-                                        <ImageSelect id={`face-${face}-image`} disabled={!config.face[face].useImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
-                                        <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || !config.face[face].useImage} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
-                                        <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || !config.face[face].useImage} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })}/>
-                                    </HStack>
-                                </VStack>
+                                <Show when={!canCloneOpposite(face) || !config.face[face].cloneOpposite}>
+                                    <VStack>
+                                        <HStack alignItems='center'>
+                                            <Typography variant='button'>Use...</Typography>
+                                            <Checkbox label='Label' checked={config.face[face].useLabel} onChange={useLabel => setConfig('face', face, { useLabel })} />
+                                            <Checkbox label='Image' checked={config.face[face].useImage} onChange={useImage => setConfig('face', face, { useImage })} />
+                                        </HStack>
+                                        <TextInput id={`face-${face}-text`} label='Label' disabled={!config.face[face].useLabel} multiline sx={{ width: '100%' }} placeholder={config.style.title} value={config.face[face].label} onChange={text => setConfig('face', face, { label: text })} />
+                                        <FontSelector id={`face-${face}-font`} label='Font' disabled={!config.face[face].useLabel} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
+                                        <HStack alignItems='center'>
+                                            <ImageSelect id={`face-${face}-image`} disabled={!config.face[face].useImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
+                                            <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || !config.face[face].useImage} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
+                                            <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || !config.face[face].useImage} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })} />
+                                        </HStack>
+                                    </VStack>
+                                </Show>
                             </Match>}
                         </For>
                     </Switch>
@@ -609,8 +587,8 @@ export const App = () => {
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Preview</Typography>
                         <Select id='preview' width='10em' value={config.view.preview} onChange={preview => setConfig('view', { preview })}>
-                            <Select.Item value='canvas'>Canvas</Select.Item>
-                            <Select.Item value='canvas-pretty'>Canvas (Pretty)</Select.Item>
+                            <Select.Item value='canvas'>Quick</Select.Item>
+                            <Select.Item value='canvas-pretty'>Pretty</Select.Item>
                             <Select.Item value='pdf'>Live PDF</Select.Item>
                         </Select>
                         <Button.Group>

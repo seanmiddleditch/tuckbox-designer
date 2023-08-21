@@ -41,8 +41,6 @@ export interface Face {
     label: string
     useLabel: boolean
     font: Font
-    useDefaultFont: boolean
-    useOppositeImage: boolean
     useImage: boolean
     cloneOpposite: boolean
     crop: CropData

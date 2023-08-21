@@ -16,6 +16,7 @@ export interface GenerateOptions {
     pageSize: PaperSize
     color: RGB
     bleed: number
+    safe: number
     thickness: number
     margin: number
     style: BoxStyle
@@ -34,13 +35,13 @@ export interface GenerateOptions {
 export interface GetFaceDimensionsOptions {
     size: Size
     thickness: number
-    bleed: number
+    safe: number
 }
 
 export function getFaceDimensions(face: Faces, options: GetFaceDimensionsOptions): [number, number] {
-    const width = options.size.width + options.thickness * 2 - options.bleed * 2
-    const height = options.size.height + options.thickness * 2 - options.bleed * 2
-    const depth = options.size.depth + options.thickness * 2 - options.bleed * 2
+    const width = options.size.width + options.thickness * 2 - options.safe * 2
+    const height = options.size.height + options.thickness * 2 - options.safe * 2
+    const depth = options.size.depth + options.thickness * 2 - options.safe * 2
 
     switch (face) {
         case 'front':
@@ -355,16 +356,16 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
     }
 
     const drawImage = (tx: number, ty: number, tw: number, th: number, image: HTMLCanvasElement, r: number = 0) => {
-        const b = options.bleed
+        const b = options.safe
 
         ctx.save()
         ctx.translate(tx, ty)
         ctx.rotate(r)
 
-        // adjust for bleed, which is relative to the rotated offset (must be after rotate)
+        // adjust for safe, which is relative to the rotated offset (must be after rotate)
         ctx.translate(b, b)
        
-        // image is drawn within the bleed area of the requested rect
+        // image is drawn within the safe area of the requested rect
         ctx.drawImage(image, 0, 0, tw - b * 2, th - b * 2)
         ctx.restore()
     }
@@ -516,11 +517,11 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
 
         if (side == 'back') {
             ctx.fillRect(front.x - size.depth + options.bleed, front.y + options.bleed, size.depth - options.bleed * 2, front.height - options.bleed * 2)
-            writeCenterAngle('Glue Here (A)', instructFont, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height - options.bleed * 2)
+            writeCenterAngle('Side (A)', instructFont, front.x - size.depth * 0.5, front.y + front.height * 0.5, Math.PI * 0.5, front.height - options.bleed * 2)
 
             if (options.style != 'double-tuck') {
                 ctx.fillRect(front.x + options.bleed, front.y + front.height + options.bleed, front.width - options.bleed * 2, size.depth - options.bleed * 2)
-                writeCenterAngle('Glue Here (B)', instructFont, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, front.width - options.bleed * 2)
+                writeCenterAngle('Side (B)', instructFont, front.x + front.width * 0.5, front.y + front.height + size.depth * 0.5, Math.PI, front.width - options.bleed * 2)
             }
         }
 
