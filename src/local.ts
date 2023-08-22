@@ -15,3 +15,16 @@ export function createLocalStore<T extends Object>(name: string, init: T): [T, S
     createEffect(() => localStorage.setItem(name, JSON.stringify(store)))
     return [store, setStore]
 }
+
+export function createSessionStore<T extends Object>(name: string, init: T): [T, SetStoreFunction<T>] {
+    const sessionStateString = sessionStorage.getItem(name)
+
+    const sessionState: DeepPartial<T> = sessionStateString ? JSON.parse(sessionStateString) : {}
+    const initialState: T = JSON.parse(JSON.stringify(init))
+    deepmergeInto(initialState, sessionState)
+
+    const [store, setStore] = createStore<T>(initialState)
+
+    createEffect(() => sessionStorage.setItem(name, JSON.stringify(store)))
+    return [store, setStore]
+}

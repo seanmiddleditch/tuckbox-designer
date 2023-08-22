@@ -3,7 +3,7 @@ import { createStore } from 'solid-js/store'
 import { paperSize, PaperFormats, getPaperSizes, getPaperSize } from './paper'
 import { convert, Units } from './convert'
 import { FaceOptions, GenerateMode, GenerateSide, generate, getFaceDimensions } from './generate'
-import { createLocalStore } from './local'
+import { createLocalStore, createSessionStore } from './local'
 import { colorToRgb } from './color'
 import PDFDocument from 'jspdf'
 import { Button } from './components/button'
@@ -32,10 +32,6 @@ interface Config {
         style: BoxStyle
         twoSided: boolean
     }
-    view: {
-        preview: 'canvas' | 'canvas-pretty' | 'pdf'
-        face: Faces
-    }
     face: {
         front: Face
         back: Face
@@ -49,6 +45,11 @@ interface Config {
     safeArea: number
     margin: number
     thickness: number
+}
+
+interface View {
+    preview: 'canvas' | 'canvas-pretty' | 'pdf'
+    face: Faces
 }
 
 interface FaceCache<T> {
@@ -89,10 +90,6 @@ const defualtConfig: Config = {
         style: 'default',
         twoSided: false,
     },
-    view: {
-        preview: 'canvas',
-        face: 'front',
-    },
     face: {
         front: { ...defaultFace, useImage: true, useLabel: true },
         back: { ...defaultFace, cloneOpposite: true },
@@ -110,6 +107,11 @@ const defualtConfig: Config = {
     safeArea: 0.12,
     margin: 0.25,
     thickness: 0.02
+}
+
+const defaultView: View = {
+    preview: 'canvas',
+    face: 'front',
 }
 
 interface AppState {
@@ -211,6 +213,7 @@ const loadImage = (blob: Blob, crop: CropData, dims: [number, number], options: 
 
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
+    const [view, setView] = createSessionStore('tuckbox-view', defaultView)
     const [state, setState] = createStore<AppState>({loading: true})
     const [imageCache, setImageCache] = createStore<FaceCache<HTMLCanvasElement>>({})
     const [blobCache, setBlobCache] = createStore<FaceCache<Blob>>({})
@@ -392,7 +395,7 @@ export const App = () => {
     createEffect(() => {
         const pageSize = paperSize({ 'format': config.page, 'units': config.units, 'orientation': 'landscape' })
 
-        if (config.view.preview == 'pdf') {
+        if (view.preview == 'pdf') {
             const preview = previewObject()
             if (!preview)
                 return
@@ -416,7 +419,7 @@ export const App = () => {
             const ctx = canvas.getContext("2d")!
             ctx.clearRect(0, 0, canvas.width, canvas.height)
 
-            renderTuckBox(ctx, { mode: config.view.preview == 'canvas-pretty' ? 'pretty' : config.style.twoSided ? 'two-sided' : 'standard' })
+            renderTuckBox(ctx, { mode: view.preview == 'canvas-pretty' ? 'pretty' : config.style.twoSided ? 'two-sided' : 'standard' })
         }
 
     })
@@ -545,7 +548,7 @@ export const App = () => {
                     </HStack>
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Face Styling</Typography>
-                        <Select id='current-face' value={config.view.face} onChange={face => setConfig('view', 'face', face)}>
+                        <Select id='current-face' value={view.face} onChange={face => setView({ face })}>
                             <Select.Item value='front'>Front</Select.Item>
                             <Select.Item value='back'>Back</Select.Item>
                             <Select.Item value='top'>Top</Select.Item>
@@ -553,16 +556,16 @@ export const App = () => {
                             <Select.Item value='left'>Left</Select.Item>
                             <Select.Item value='right'>Right</Select.Item>
                         </Select>
-                        <Show when={canCloneOpposite(config.view.face)}>
+                        <Show when={canCloneOpposite(view.face)}>
                             <Checkbox
-                                label={`Clone ${titlecase(getOppositeFace(config.view.face))} Face`}
-                                checked={config.face[config.view.face].cloneOpposite ?? false}
-                                onChange={cloneOpposite => setConfig('face', config.view.face, { cloneOpposite })} />
+                                label={`Clone ${titlecase(getOppositeFace(view.face))} Face`}
+                                checked={config.face[view.face].cloneOpposite ?? false}
+                                onChange={cloneOpposite => setConfig('face', view.face, { cloneOpposite })} />
                         </Show>
                     </HStack>
                     <Switch>
                         <For each={faces}>
-                            {face => <Match when={config.view.face == face}>
+                            {face => <Match when={view.face == face}>
                                 <Show when={!canCloneOpposite(face) || !config.face[face].cloneOpposite}>
                                     <VStack>
                                         <HStack alignItems='center'>
@@ -586,7 +589,7 @@ export const App = () => {
                 <VStack alignItems='flex-start' width='100%'>
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Preview</Typography>
-                        <Select id='preview' width='10em' value={config.view.preview} onChange={preview => setConfig('view', { preview })}>
+                        <Select id='preview' width='10em' value={view.preview} onChange={preview => setView({ preview })}>
                             <Select.Item value='canvas'>Quick</Select.Item>
                             <Select.Item value='canvas-pretty'>Pretty</Select.Item>
                             <Select.Item value='pdf'>Live PDF</Select.Item>
@@ -603,7 +606,7 @@ export const App = () => {
                     <Switch fallback={<>
                         <canvas width='800' height='600' ref={setPreviewCanvas} style={{ border: '1px solid grey' }}></canvas>
                     </>}>
-                        <Match when={config.view.preview == 'pdf'}>
+                        <Match when={view.preview == 'pdf'}>
                             <object ref={setPreviewObject} type='application/pdf' width='800' height='600'><Typography>Loading...</Typography></object>
                         </Match>
                     </Switch>
