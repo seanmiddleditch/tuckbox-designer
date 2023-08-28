@@ -17,21 +17,21 @@ import { FontSelector } from './components/font-selector'
 import { ImageSelect, ImageSelectResult } from './components/image-select'
 import { Typography, Link, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@suid/material'
 import { BugReportRounded as BugIcon, CopyrightRounded as CopyrightIcon, Download as DownloadIcon } from '@suid/icons-material'
-import { Font, Size, Face, RGB, Faces, CropData, BoxStyle } from './types'
-import Cropper from 'cropperjs'
+import { Font, Size, Face, RGB, Faces, CropData, BoxStyle, Background } from './types'
 import patchJsPdf from './jspdf-patch'
 
 import '@suid/material'
+import { renderToBackground, featherImage, loadBlobToCanvas, cropImage } from './image'
 
 interface Config {
     units: Units
     page: PaperFormats
     style: {
         title: string
-        color: RGB
         style: BoxStyle
         twoSided: boolean
     }
+    background: Background
     face: {
         front: Face
         back: Face
@@ -52,7 +52,8 @@ interface View {
     face: Faces
 }
 
-interface FaceCache<T> {
+interface ImageCache<T> {
+    background?: T
     front?: T
     back?: T
     top?: T
@@ -70,13 +71,23 @@ const defaultFont: Font = {
     outlineWidth: 3,
 }
 
+const defaultCropData: CropData = {
+    x: 0,
+    y: 0,
+    width: 0,
+    height: 0,
+    rotate: 0,
+    scaleX: 1,
+    scaleY: 1,
+}
+
 const defaultFace: Face = {
     label: '',
     font: { ...defaultFont },
     useLabel: true,
     useImage: false,
     cloneOpposite: false,
-    crop: { x: 0, y: 0, width: 0, height: 0, rotate: 0, scaleX: 1, scaleY: 1 },
+    crop: { ...defaultCropData },
     feather: 0,
     opacity: 1.0,
 }
@@ -86,9 +97,14 @@ const defualtConfig: Config = {
     page: 'letter',
     style: {
         title: 'Sample',
-        color: { r: 255, g: 255, b: 255 },
         style: 'default',
         twoSided: false,
+    },
+    background: {
+        color: { r: 255, g: 255, b: 255 },
+        crop: { ...defaultCropData },
+        opacity: 1.0,
+        tileSize: { width: 1, height: 1 }
     },
     face: {
         front: { ...defaultFace, useImage: true, useLabel: true },
@@ -118,7 +134,10 @@ interface AppState {
     loading: boolean
 }
 
-const faces: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
+type ImageKeys = keyof ImageCache<Blob>
+
+const faceKeys: Faces[] = ['front', 'back', 'top', 'bottom', 'left', 'right']
+const imageKeys: ImageKeys[] = ['front', 'back', 'top', 'bottom', 'left', 'right', 'background']
 
 const canCloneOpposite = (face: Faces) => face == 'back' || face == 'bottom' || face == 'right'
 
@@ -141,82 +160,19 @@ interface LoadImageOptions {
     opacity: number
 }
 
-const loadImage = (blob: Blob, crop: CropData, dims: [number, number], options: LoadImageOptions): Promise<HTMLCanvasElement> => {
-    const img = new Image()
-    const url = URL.createObjectURL(blob)
-    const promise = new Promise<HTMLCanvasElement>((resolve, reject) => {
-        img.onload = () => {
-            document.body.appendChild(img)
-
-            const cropper = new Cropper(img, {
-                data: crop,
-                background: false,
-                ready: () => {
-                    const canvas = cropper.getCroppedCanvas({
-                        width: dims[0] || 400,
-                        height: dims[1] || 300,
-                        imageSmoothingEnabled: true,
-                        imageSmoothingQuality: 'high',
-                    })
-                    cropper.destroy()
-                    document.body.removeChild(img)
-                    resolve(canvas)
-                }
-            })
-        }
-        img.onerror = reject
-    })
-        .finally(() => URL.revokeObjectURL(url))
-        .then(cropped => {
-            const f = options.feather
-            if (f <= 0)
-                return cropped
-
-            const canvas = document.createElement('canvas')
-            canvas.width = cropped.width
-            canvas.height = cropped.height
-            const ctx = canvas.getContext('2d')
-            if (!ctx) throw 'Failed to create canvas context'
-
-            // feather edges
-            ctx.shadowOffsetX = canvas.width
-            ctx.shadowBlur = f
-            ctx.shadowColor = '#0f0'
-            ctx.fillRect(-canvas.width + f, f, canvas.width - f * 2, canvas.height - f * 2)
-            
-            ctx.shadowBlur = 0
-            ctx.globalCompositeOperation = 'source-in'
-            ctx.drawImage(cropped, 0, 0)
-
-            return canvas
-        })
-        .then(image => {
-            const canvas = document.createElement('canvas')
-            canvas.width = image.width
-            canvas.height = image.height
-            const ctx = canvas.getContext('2d')
-            if (!ctx) throw 'Failed to create canvas context'
-
-            // we fill in the background with our box color
-            // due to https://github.com/parallax/jsPDF/issues/816
-            ctx.fillStyle = colorToRgb(options.color)
-            ctx.fillRect(0, 0, canvas.width, canvas.height)
-
-            ctx.globalAlpha = options.opacity
-
-            ctx.drawImage(image, 0, 0)
-            return canvas
-        })
-    img.src = url
-    return promise
+const loadImage = (blob: Blob, crop: CropData, dims: { width: number, height: number }, options: LoadImageOptions): Promise<HTMLCanvasElement> => {
+    return loadBlobToCanvas(blob)
+        .then(image => cropImage(image, dims, crop))
+        .then(cropped => featherImage(cropped, options.feather))
+        .then(image => renderToBackground(image, options.color, options.opacity))
 }
 
 export const App = () => {
     const [config, setConfig] = createLocalStore('tuckbox-config', defualtConfig)
     const [view, setView] = createSessionStore('tuckbox-view', defaultView)
     const [state, setState] = createStore<AppState>({loading: true})
-    const [imageCache, setImageCache] = createStore<FaceCache<HTMLCanvasElement>>({})
-    const [blobCache, setBlobCache] = createStore<FaceCache<Blob>>({})
+    const [imageCache, setImageCache] = createStore<ImageCache<HTMLCanvasElement>>({})
+    const [blobCache, setBlobCache] = createStore<ImageCache<Blob>>({})
 
     const [previewCanvas, setPreviewCanvas] = createSignal<HTMLCanvasElement | undefined>(undefined)
     const [previewObject, setPreviewObject] = createSignal<HTMLObjectElement | undefined>(undefined)
@@ -227,48 +183,46 @@ export const App = () => {
 
     const toPt = (value: number) => convert(value, config.units, 'pt')
     
-    const getFaceDimensionsPixels = (face: Faces): [number, number] => {
+    const getFaceDimensionsPixels = (face: Faces): { width: number, height: number } => {
         const size = {
             width: config.size.width,
             height: config.size.height,
             depth: config.size.depth,
         }
         const dims = getFaceDimensions(face, { size, thickness: config.thickness, safe: config.safeArea })
-        return [convert(dims[0], config.units, 'px'), convert(dims[1], config.units, 'px')]
+        return { width: convert(dims[0], config.units, 'px'), height: convert(dims[1], config.units, 'px') }
     }
 
     // load up the image cache
+    const loadBlob = async (dir: FileSystemDirectoryHandle, key: ImageKeys): Promise<Blob|undefined> => {
+        let h: FileSystemFileHandle
+        try {
+            h = await dir.getFileHandle(key)
+        }
+        catch (e) {
+            if (e instanceof Error && e.name != 'NotFoundError')
+                throw e
+            return
+        }
+        return await h.getFile()
+    }
     navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images', { create: true }))
-        .then(dir => {
-            return Promise.all(faces.map(async (face) => {
-                let h: FileSystemFileHandle
-                try {
-                    h = await dir.getFileHandle(face)
-                }
-                catch (e) {
-                    if (e instanceof Error && e.name != 'NotFoundError')
-                        throw e
-                    return
-                }
-                const file = await h.getFile()
-                setBlobCache(face, file)
-            }))
-        })
+        .then(dir => Promise.all(imageKeys.map(key => loadBlob(dir, key).then(blob => setBlobCache(key, blob)))))
         .catch(err => console.error(err))
         .finally(() => setState({ loading: false }))
     
-    const saveImage = (face: Faces, blob: Blob) => {
+    const saveImage = (key: ImageKeys, blob: Blob) => {
         navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images', { create: true })).then(async (dir) => {
-            const handle = await dir.getFileHandle(face, { create: true })
+            const handle = await dir.getFileHandle(key, { create: true })
             const writeable = await handle.createWritable()
             blob.stream().pipeTo(writeable)
         })
         .catch(err => console.error(err))
     }
 
-    const deleteImage = (face: Faces) => {
+    const deleteImage = (key: ImageKeys) => {
         navigator.storage.getDirectory().then(dir => dir.getDirectoryHandle('images'))
-            .then(dir => dir.removeEntry(face))
+            .then(dir => dir.removeEntry(key))
             .catch(err => err.name != 'NotFoundError' ?  console.error(err) : false)
     }
 
@@ -282,24 +236,49 @@ export const App = () => {
     })
 
     // Update canvas caches of images
-    faces.map(face => {
+    faceKeys.map(face => {
         createEffect(() => {
             const blob = blobCache[face]
             if (blob && config.face[face].crop) {
-                // we need to read the properties themselves to be reactive
-                const { x, y, width, height, scaleX, scaleY, rotate } = config.face[face].crop
-                const options = {
-                    color: { ...config.style.color },
-                    feather: +config.face[face].feather,
-                    opacity: +config.face[face].opacity,
-                }
+                // we need to read the properties themselves to be reactive,
+                // and they cannot be bound for async functions
+                const feather = config.face[face].feather
+                const opacity = config.face[face].opacity
+                const crop = { ...config.face[face].crop }
+                const color = { ...config.background.color }
 
-                loadImage(blob, { x, y, width, height, scaleX, scaleY, rotate }, getFaceDimensionsPixels(face), options)
+                return loadBlobToCanvas(blob)
+                    .then(image => cropImage(image, getFaceDimensionsPixels(face), crop))
+                    .then(cropped => featherImage(cropped, feather))
+                    .then(image => renderToBackground(image, color, opacity))
                     .then(canvas => setImageCache(face, canvas))
             } else {
                 setImageCache(face, undefined)
             }
         })
+    })
+
+    createEffect(() => {
+        const blob = blobCache['background']
+        if (blob) {
+            // we need to read the properties themselves to be reactive,
+            // and they cannot be bound for async functions
+            const opacity = config.background.opacity
+            const crop = { ...config.background.crop }
+            const color = { ...config.background.color }
+            const size = {
+                width: convert(config.background.tileSize.width, config.units, 'px'),
+                height: convert(config.background.tileSize.height, config.units, 'px'),
+            }
+
+            return loadBlobToCanvas(blob)
+                .then(image => cropImage(image, size, crop))
+                .then(image => renderToBackground(image, color, opacity))
+                .then(canvas => setImageCache('background', canvas))
+        }
+        else {
+            setImageCache('background', undefined)
+        }
     })
 
     const changeUnits = (units: Units) => {
@@ -316,7 +295,14 @@ export const App = () => {
                 safe: cv(store.safeArea),
                 margin: cv(store.margin),
                 thickness: cv(store.thickness),
-                units
+                background: {
+                    ...store.background,
+                    tileSize: {
+                        width: cv(store.background.tileSize.width),
+                        height: cv(store.background.tileSize.height),
+                    }
+                },
+                units,
             }
         })
     }
@@ -356,7 +342,11 @@ export const App = () => {
             size,
             pageSize: paperSize({ 'format': config.page, 'units': 'pt', 'orientation': 'landscape' }),
             style: config.style.style,
-            color: config.style.color,
+            background: {
+                color: config.background.color,
+                image: imageCache['background'],
+                opacity: 1.0,
+            },
             bleed: toPt(config.bleed),
             safe: toPt(config.safeArea),
             thickness: toPt(config.thickness),
@@ -471,7 +461,32 @@ export const App = () => {
             else {
                 setBlobCache(face, undefined)
                 deleteImage(face)
-                setConfig('face', face, 'crop', defaultFace.crop)
+                setConfig('face', face, 'crop', defaultCropData)
+            }
+        })
+    }
+
+    const setBackgroundImage = (result: ImageSelectResult) => {
+        batch(() => {
+            if (result) {
+                if (result.blob !== blobCache['background']) {
+                    setBlobCache('background', result.blob)
+                    saveImage('background', result.blob)
+                }
+                setConfig('background', 'crop', {
+                    x: result.cropData.x,
+                    y: result.cropData.y,
+                    width: result.cropData.width,
+                    height: result.cropData.height,
+                    rotate: result.cropData.rotate,
+                    scaleX: result.cropData.scaleX,
+                    scaleY: result.cropData.scaleY,
+                })
+            }
+            else {
+                setBlobCache('background', undefined)
+                deleteImage('background')
+                setConfig('background', 'crop', defaultCropData)
             }
         })
     }
@@ -540,12 +555,22 @@ export const App = () => {
                     <Typography variant='h6'>Box Styling</Typography>
                     <TextInput id='title' label='Deck Name' sx={{ width: '100%' }} value={config.style.title} onChange={title => setConfig('style', { title })} />
                     <HStack alignItems='center'>
-                        <ColorPicker id='box-color' label='Box Color' color={config.style.color} onChange={color => setConfig('style', { color })} />
+                        <ColorPicker id='box-color' label='Color' color={config.background.color} onChange={color => setConfig('background', { color })} />
                         <Select id='box-style' label='Box Style' value={config.style.style} onChange={style => setConfig('style', { style })}>
                             <Select.Item value='default'>Glued Bottom</Select.Item>
                             <Select.Item value='double-tuck'>Tucked Bottom</Select.Item>
                         </Select>
                     </HStack>
+                    {/* 
+                    <Typography variant='h6'>Box Background</Typography>
+                    <HStack alignItems='center'>
+                        Disable background image for now -- https://github.com/seanmiddleditch/tuckbox-designer/issues/26
+                        <NumberInput id="background-width" value={config.background.tileSize.width} units={config.units} min={0} onChange={value => setConfig('background', 'tileSize', 'width', value)} label='Width' />
+                        <NumberInput id="background-height" value={config.background.tileSize.height} units={config.units} min={0} onChange={value => setConfig('background', 'tileSize', 'height', value)} label='Height' />
+                        <NumberInput id="background-opacity" disabled={!blobCache['background']} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.background.opacity * 100)} onChange={opacity => setConfig('background', { opacity: opacity / 100.0 })} />
+                        <ImageSelect id="background-image" label='Select Image' blob={blobCache['background']} cropData={config.background.crop} onChange={result => setBackgroundImage(result)} />
+                    </HStack>
+                    */}
                     <HStack alignItems='center'>
                         <Typography variant='h6'>Face Styling</Typography>
                         <Select id='current-face' value={view.face} onChange={face => setView({ face })}>
@@ -564,7 +589,7 @@ export const App = () => {
                         </Show>
                     </HStack>
                     <Switch>
-                        <For each={faces}>
+                        <For each={faceKeys}>
                             {face => <Match when={view.face == face}>
                                 <Show when={!canCloneOpposite(face) || !config.face[face].cloneOpposite}>
                                     <VStack>
@@ -576,7 +601,7 @@ export const App = () => {
                                         <TextInput id={`face-${face}-text`} label='Label' disabled={!config.face[face].useLabel} multiline sx={{ width: '100%' }} placeholder={config.style.title} value={config.face[face].label} onChange={text => setConfig('face', face, { label: text })} />
                                         <FontSelector id={`face-${face}-font`} label='Font' disabled={!config.face[face].useLabel} value={config.face[face].font} onChange={font => setConfig('face', face, 'font', font)} />
                                         <HStack alignItems='center'>
-                                            <ImageSelect id={`face-${face}-image`} disabled={!config.face[face].useImage} label='Select Image' dimensions={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
+                                            <ImageSelect id={`face-${face}-image`} disabled={!config.face[face].useImage} label='Select Image' size={getFaceDimensionsPixels(face)} blob={blobCache[face]} cropData={config.face[face].crop} onChange={result => setFaceImage(face, result)} />
                                             <NumberInput id={`face-${face}-feather`} disabled={!blobCache[face] || !config.face[face].useImage} label='Feather' units='px' min={0} value={config.face[face].feather} onChange={feather => setConfig('face', face, { feather })} />
                                             <NumberInput id={`face-${face}-opacity`} disabled={!blobCache[face] || !config.face[face].useImage} label='Opacity' units='%' integer min={0} max={100} step={1} value={Math.round(config.face[face].opacity * 100)} onChange={opacity => setConfig('face', face, { opacity: opacity / 100.0 })} />
                                         </HStack>

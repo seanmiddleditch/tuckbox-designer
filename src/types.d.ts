@@ -37,6 +37,13 @@ export interface CropData {
     scaleY: number
 }
 
+export interface Background {
+    color: RGB
+    crop: CropData
+    opacity: number
+    tileSize: { width: number, height: number }
+}
+
 export interface Face {
     label: string
     useLabel: boolean

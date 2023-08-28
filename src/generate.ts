@@ -1,5 +1,5 @@
 import { Size, Font, RGB, Faces, BoxStyle } from './types'
-import { luminosity } from './color'
+import { colorToRgb, luminosity } from './color'
 import { PaperSize } from './paper'
 
 export interface FaceOptions {
@@ -8,13 +8,18 @@ export interface FaceOptions {
     image?: HTMLCanvasElement
 }
 
+export interface BackgroundOptions {
+    color: RGB
+    image?: HTMLCanvasElement
+    opacity: number
+}
+
 export type GenerateMode = 'standard' | 'pretty' | 'two-sided'
 export type GenerateSide = 'front' | 'back'
 
 export interface GenerateOptions {
     size: Size
     pageSize: PaperSize
-    color: RGB
     bleed: number
     safe: number
     thickness: number
@@ -22,6 +27,7 @@ export interface GenerateOptions {
     style: BoxStyle
     mode?: GenerateMode
     side?: GenerateSide
+    background: BackgroundOptions
     face: {
         front: FaceOptions
         back: FaceOptions
@@ -89,7 +95,7 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         }
     }
 
-    const bgLuminosity = side == 'front' ? luminosity(options.color) : 1
+    const bgLuminosity = side == 'front' ? luminosity(options.background.color) : 1
     const cutColor = bgLuminosity < .7 ? '#fff' : '#000'
     const scoreColor = bgLuminosity < .7 ? '#eee' : '#111'
     const innerColor = '#ccc'
@@ -370,14 +376,25 @@ export function generate(ctx: CanvasRenderingContext2D, options: GenerateOptions
         ctx.restore()
     }
 
-    // box color (overlap to handle bleed)
-    if (hasDesign && (options.color.r !== 1 || options.color.g !== 1 || options.color.b !== 1)) {
+    // box color and image (overlap to handle bleed)
+    if (hasDesign) {
         ctx.save()
-
         ctx.setLineDash([])
-        ctx.fillStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
-        ctx.strokeStyle = `rgb(${options.color.r}, ${options.color.g}, ${options.color.b})`
         ctx.lineWidth = options.bleed * 2
+
+        const c = options.background.color
+        if (c.r !== 1 || c.g !== 1 || c.b !== 1) {
+            ctx.fillStyle = colorToRgb(c)
+            ctx.strokeStyle = colorToRgb(c)
+        }
+
+        if (options.background.image) {
+            const pattern = ctx.createPattern(options.background.image, 'repeat')
+            if (pattern) {
+                ctx.fillStyle = pattern
+                ctx.strokeStyle = pattern
+            }
+        }
 
         ctx.beginPath()
 

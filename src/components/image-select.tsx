@@ -14,7 +14,7 @@ export type ImageSelectResult = { canvas: HTMLCanvasElement, blob: Blob, cropDat
 
 interface ImageSelectProps {
     id: string
-    dimensions: [number, number]
+    size?: { width: number, height: number }
     disabled?: boolean
     label: string
     blob?: Blob
@@ -38,7 +38,7 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
 
     let fileRef: HTMLInputElement | undefined = undefined
     
-    const aspectRatio = props.dimensions[1] != 0 ? props.dimensions[0] / props.dimensions[1] : 4 / 3
+    const aspectRatio = props.size ? (props.size.height != 0 ? props.size.width / props.size.height : 4 / 3) : undefined
 
     onCleanup(() => {
         if (store.cropper)
@@ -118,8 +118,8 @@ export const ImageSelect: Component<ImageSelectProps> = props => {
     const onFinishCrop = () => batch(() => {
         if (store.cropper && store.file) {
             const canvas = store.cropper.getCroppedCanvas({
-                width: props.dimensions[0] || 400,
-                height: props.dimensions[1] || 300,
+                width: props.size?.width,
+                height: props.size?.height,
                 imageSmoothingEnabled: true,
                 imageSmoothingQuality: 'high'
             })
